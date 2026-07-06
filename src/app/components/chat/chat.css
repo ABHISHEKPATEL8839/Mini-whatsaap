@@ -357,11 +357,14 @@
 }
 
 @keyframes spin {
-  to { transform: rotate(360deg); }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 /* Image & Video bubble styling */
-.msg-image-wrap, .msg-video-wrap {
+.msg-image-wrap,
+.msg-video-wrap {
   margin-bottom: 6px;
   border-radius: 12px;
   overflow: hidden;
@@ -399,7 +402,8 @@
 }
 
 .read-receipt.read {
-  color: #53bdeb; /* WhatsApp blue ticks color */
+  color: #53bdeb;
+  /* WhatsApp blue ticks color */
 }
 
 /* Media preview block */
@@ -484,7 +488,7 @@
   border-top: 1px solid var(--border-light);
   padding: 12px 20px;
   z-index: 15;
-  box-shadow: 0 -4px 15px rgba(0,0,0,0.3);
+  box-shadow: 0 -4px 15px rgba(0, 0, 0, 0.3);
 }
 
 .emoji-grid {
@@ -507,7 +511,7 @@
 }
 
 .emoji-btn:hover {
-  background: rgba(255,255,255,0.06);
+  background: rgba(255, 255, 255, 0.06);
   transform: scale(1.18);
 }
 
@@ -583,7 +587,7 @@
   opacity: 0;
   pointer-events: none;
   transition: opacity 0.2s ease, color 0.15s ease, transform 0.15s ease;
-  color: var(--text-muted);
+  color: #0D1118;
   background: transparent;
   width: 28px;
   height: 28px;
@@ -599,7 +603,7 @@
   transform: scale(1.15);
 }
 
-.message-bubble-wrap:hover .delete-msg-btn {
+.message-bubble-wrap .delete-msg-btn {
   opacity: 1;
   pointer-events: auto;
 }
@@ -656,7 +660,7 @@
   top: 0;
   left: 0;
   width: 100vw;
-  height: 100vh;
+  height: 100dvh;
   background: rgba(10, 14, 22, 0.7);
   backdrop-filter: blur(8px);
   z-index: 2000;
