@@ -222,10 +222,7 @@
 
   <!-- ngx-emoji-mart Picker Component Container -->
   @if (showEmojiPicker()) {
-  <div class="emoji-picker-container shadow-lg"
-    style="border-top: 1px solid rgba(255,255,255,0.08); background: #121b22; z-index: 10;">
-    <emoji-mart (emojiSelect)="addEmojiMart($event)" theme="dark"></emoji-mart>
-  </div>
+  <emoji-mart (emojiSelect)="addEmojiMart($event)" [darkMode]="true"></emoji-mart>
   }
 
   <!-- Bottom Message Text Area & toolbar -->
