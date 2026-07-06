@@ -1,13 +1,39 @@
 <div class="chat-window">
+
+  @if (!chatId || chatId === '') {
+  <!-- Default Welcome Splash View -->
+  <div class="d-flex flex-column align-items-center justify-content-center h-100 p-4 text-center text-white"
+    style="background-color: #0c1317; flex: 1;">
+    <div class="brand-welcome-logo text-success bg-success bg-opacity-10 rounded-circle p-4 mb-3"
+      style="width: 100px; height: 100px; display: flex; align-items: center; justify-content: center; font-size: 3.5rem;">
+      <i class="bi bi-chat-text-fill text-success"></i>
+    </div>
+    <h2 class="fw-bold mb-2">Abhi WhatsApp</h2>
+    <p class="text-secondary small mb-0" style="max-width: 400px;">
+      Select a friend or a custom group from the sidebar to start a private conversation. Connect and share media
+      securely.
+    </p>
+    <div
+      class="mt-4 pt-3 border-top border-secondary border-opacity-10 text-muted small d-flex align-items-center gap-1"
+      style="font-size: 0.8rem;">
+      <i class="bi bi-shield-lock-fill text-success"></i> End-to-end encrypted
+    </div>
+  </div>
+  } @else {
+
+  <!-- Chat Header Section -->
   <div class="chat-header">
     <div class="chat-header-info">
-      <button class="btn btn-link text-white p-0 me-3 d-md-none border-0 shadow-none" (click)="goBack()" title="Back to chats">
+      <button class="btn btn-link text-white p-0 me-3 d-md-none border-0 shadow-none" (click)="goBack()"
+        title="Back to chats">
         <i class="bi bi-chevron-left fs-4"></i>
       </button>
-      @if (chatId === 'group') {
+      @if (isGroupChat) {
+      <!-- @if (chatId.includes('group_')) { -->
       <div class="partner-avatar group-avatar-style">
         <i class="bi bi-people-fill"></i>
       </div>
+      <!-- } -->
       } @else {
       <div class="partner-avatar" [style.background-color]="getUserColor(chatPartner?.uid || '')">
         {{ getUserInitials(chatPartner?.displayName || '') }}
@@ -27,192 +53,211 @@
     </div>
   </div>
 
+  <!-- MAIN CHAT PANEL -->
   @if (friendship().status !== 'accepted') {
-    <div class="d-flex flex-column align-items-center justify-content-center h-100 p-4 text-center animate-fade-in" style="background: rgba(10, 14, 22, 0.6); flex: 1;">
-      <div class="rounded-circle bg-success bg-opacity-10 p-4 mb-4 text-success border border-success border-opacity-25 shadow-lg animate-pulse-glow" style="font-size: 3.5rem; width: fit-content; animation: pulseGlow 2s infinite;">
-        <i class="bi bi-shield-lock-fill"></i>
-      </div>
-      <h3 class="fw-bold mb-2">Connect to Chat</h3>
-      <p class="text-secondary mb-4" style="max-width: 380px;">
-        You cannot exchange direct messages with <strong>{{ chatPartner?.displayName }}</strong> until your chat invitation is accepted.
-      </p>
-      
-      @if (friendship().status === 'none') {
-        <button class="btn btn-success px-4 py-2" (click)="sendInvite()">
-          <i class="bi bi-person-plus-fill me-2"></i> Send Chat Request
-        </button>
-      } @else if (friendship().status === 'pending') {
-        @if (friendship().invite?.senderUid === currentUser?.uid) {
-          <div class="px-4 py-3 bg-secondary bg-opacity-10 rounded border border-secondary border-opacity-25 text-secondary">
-            <i class="bi bi-clock-history me-2"></i> Request sent. Waiting for response...
-          </div>
-        } @else {
-          <div class="card bg-dark text-white border-success p-3 shadow" style="max-width: 350px;">
-            <p class="mb-3"><strong>{{ chatPartner?.displayName }}</strong> has invited you to chat.</p>
-            <div class="d-flex gap-2">
-              <button class="btn btn-success flex-fill" (click)="acceptInvite(friendship().invite!.id)">Accept</button>
-              <button class="btn btn-outline-danger text-white bg-danger bg-opacity-25 flex-fill" (click)="rejectInvite(friendship().invite!.id)">Reject</button>
-            </div>
-          </div>
-        }
-      } @else if (friendship().status === 'rejected') {
-        @if (friendship().invite?.senderUid === currentUser?.uid) {
-          <div class="text-danger mb-3"><i class="bi bi-x-circle-fill me-1"></i> Your chat request was declined by this user.</div>
-          <button class="btn btn-outline-danger text-white bg-danger bg-opacity-25 px-4 py-2" (click)="sendInvite()">
-            <i class="bi bi-arrow-clockwise me-1"></i> Resend Request
-          </button>
-        } @else {
-          <div class="text-secondary mb-3"><i class="bi bi-x-circle me-1"></i> You declined this connection request.</div>
-          <button class="btn btn-success px-4 py-2" (click)="acceptInvite(friendship().invite!.id)">
-            <i class="bi bi-check-lg me-1"></i> Accept Connection
-          </button>
-        }
-      }
+  <div class="d-flex flex-column align-items-center justify-content-center h-100 p-4 text-center animate-fade-in"
+    style="background: rgba(10, 14, 22, 0.6); flex: 1;">
+    <div
+      class="rounded-circle bg-success bg-opacity-10 p-4 mb-4 text-success border border-success border-opacity-25 shadow-lg animate-pulse-glow"
+      style="font-size: 3.5rem; width: fit-content; animation: pulseGlow 2s infinite;">
+      <i class="bi bi-shield-lock-fill"></i>
     </div>
+    <h3 class="fw-bold mb-2">Connect to Chat</h3>
+    <p class="text-secondary mb-4" style="max-width: 380px;">
+      You cannot exchange direct messages with <strong>{{ chatPartner?.displayName }}</strong> until your chat
+      invitation is accepted.
+    </p>
+
+    @if (friendship().status === 'none') {
+    <button class="btn btn-success px-4 py-2" (click)="sendInvite()">
+      <i class="bi bi-person-plus-fill me-2"></i> Send Chat Request
+    </button>
+    } @else if (friendship().status === 'pending') {
+    @if (friendship().invite?.senderUid === currentUser?.uid) {
+    <div class="px-4 py-3 bg-secondary bg-opacity-10 rounded border border-secondary border-opacity-25 text-secondary">
+      <i class="bi bi-clock-history me-2"></i> Request sent. Waiting for response...
+    </div>
+    } @else {
+    <div class="card bg-dark text-white border-success p-3 shadow" style="max-width: 350px;">
+      <p class="mb-3"><strong>{{ chatPartner?.displayName }}</strong> has invited you to chat.</p>
+      <div class="d-flex gap-2">
+        <button class="btn btn-success flex-fill" (click)="acceptInvite(friendship().invite!.id)">Accept</button>
+        <button class="btn btn-outline-danger text-white bg-danger bg-opacity-25 flex-fill"
+          (click)="rejectInvite(friendship().invite!.id)">Reject</button>
+      </div>
+    </div>
+    }
+    } @else if (friendship().status === 'rejected') {
+    @if (friendship().invite?.senderUid === currentUser?.uid) {
+    <div class="text-danger mb-3"><i class="bi bi-x-circle-fill me-1"></i> Your chat request was declined by this user.
+    </div>
+    <button class="btn btn-outline-danger text-white bg-danger bg-opacity-25 px-4 py-2" (click)="sendInvite()">
+      <i class="bi bi-arrow-clockwise me-1"></i> Resend Request
+    </button>
+    } @else {
+    <div class="text-secondary mb-3"><i class="bi bi-x-circle me-1"></i> You declined this connection request.</div>
+    <button class="btn btn-success px-4 py-2" (click)="acceptInvite(friendship().invite!.id)">
+      <i class="bi bi-check-lg me-1"></i> Accept Connection
+    </button>
+    }
+    }
+  </div>
   } @else if (!isGroupMember()) {
-    <div class="d-flex flex-column align-items-center justify-content-center h-100 p-4 text-center animate-fade-in" style="background: rgba(10, 14, 22, 0.6); flex: 1;">
-      <div class="rounded-circle bg-danger bg-opacity-10 p-4 mb-4 text-danger border border-danger border-opacity-25 shadow-lg" style="font-size: 3.5rem; width: fit-content;">
-        <i class="bi bi-shield-slash-fill"></i>
-      </div>
-      <h3 class="fw-bold mb-2">Access Denied</h3>
-      <p class="text-secondary mb-4" style="max-width: 380px;">
-        You are not a member of this group. Only selected participants can access this chat.
-      </p>
+  <div class="d-flex flex-column align-items-center justify-content-center h-100 p-4 text-center animate-fade-in"
+    style="background: rgba(10, 14, 22, 0.6); flex: 1;">
+    <div
+      class="rounded-circle bg-danger bg-opacity-10 p-4 mb-4 text-danger border border-danger border-opacity-25 shadow-lg"
+      style="font-size: 3.5rem; width: fit-content;">
+      <i class="bi bi-shield-slash-fill"></i>
     </div>
+    <h3 class="fw-bold mb-2">Access Denied</h3>
+    <p class="text-secondary mb-4" style="max-width: 380px;">
+      You are not a member of this group. Only selected participants can access this chat.
+    </p>
+  </div>
   } @else {
-    <div class="messages-container" #messageContainer>
-      @if (messages().length === 0) {
-      <div class="empty-chat-state">
-        <div class="empty-icon"><i class="bi bi-chat-dots-fill"></i></div>
-        <p>No messages yet. Say hello!</p>
-        <span>Start the conversation below 👇</span>
+  <!-- Messages List -->
+  <div class="messages-container" #messageContainer>
+    @if (messages().length === 0) {
+    <div class="empty-chat-state">
+      <div class="empty-icon"><i class="bi bi-chat-dots-fill text-success"></i></div>
+      <p>No messages yet. Say hello!</p>
+      <span>Start the conversation below 👇</span>
+    </div>
+    }
+
+    @for (msg of messages(); track msg.id) {
+    <div class="message-row" [class.sent]="isSentByMe(msg)" [class.received]="!isSentByMe(msg)">
+      @if (!isSentByMe(msg)) {
+      <div class="msg-avatar" [style.background-color]="getUserColor(msg.senderId)" [title]="getSenderName(msg)">
+        {{ getUserInitials(getSenderName(msg)) }}
       </div>
       }
 
-      @for (msg of messages(); track msg.id) {
-      <div class="message-row" [class.sent]="isSentByMe(msg)" [class.received]="!isSentByMe(msg)">
-        @if (!isSentByMe(msg)) {
-        <div class="msg-avatar" [style.background-color]="getUserColor(msg.senderId)" [title]="getSenderName(msg)">
-          {{ getUserInitials(getSenderName(msg)) }}
-        </div>
+      <div class="message-bubble-wrap position-relative">
+        @if (!isSentByMe(msg) && (chatId === 'group' || chatId.startsWith('group_'))) {
+        <span class="sender-label" [style.color]="getUserColor(msg.senderId)">
+          {{ getSenderName(msg) }}
+        </span>
         }
-
-        <div class="message-bubble-wrap">
-          @if (!isSentByMe(msg) && chatId === 'group') {
-          <span class="sender-label" [style.color]="getUserColor(msg.senderId)">
-            {{ getSenderName(msg) }}
-          </span>
-          }
-          <div class="message-bubble">
-            @if (msg.mediaType === 'image') {
-            <div class="msg-image-wrap">
-              <img [src]="msg.mediaData" alt="Image Attachment" class="bubble-image" />
+        <div class="message-bubble">
+          @if (msg.mediaType === 'image') {
+          <div class="msg-image-wrap">
+            <img [src]="msg.mediaData" alt="Image Attachment" class="bubble-image" />
+          </div>
+          } @else if (msg.mediaType === 'video') {
+          <div class="msg-video-wrap">
+            <video [src]="msg.mediaData" controls class="bubble-video"></video>
+          </div>
+          } @else if (msg.mediaType === 'document') {
+          <div class="msg-document-wrap">
+            <div class="document-icon">
+              <i class="bi bi-file-earmark-arrow-down-fill text-success"></i>
             </div>
-            } @else if (msg.mediaType === 'video') {
-            <div class="msg-video-wrap">
-              <video [src]="msg.mediaData" controls class="bubble-video"></video>
-            </div>
-            } @else if (msg.mediaType === 'document') {
-            <div class="msg-document-wrap">
-              <div class="document-icon">
-                <i class="bi bi-file-earmark-arrow-down-fill"></i>
-              </div>
-              <div class="document-details">
-                <span class="document-name" [title]="msg.content">{{ msg.content }}</span>
-                <a [href]="msg.mediaData" [download]="msg.content" class="document-download-btn">
-                  <i class="bi bi-download"></i> Download
-                </a>
-              </div>
-            </div>
-            }
-
-            @if (msg.content && msg.mediaType !== 'document') {
-            <p class="message-text">{{ msg.content }}</p>
-            }
-
-            <div class="bubble-meta">
-              <span class="message-time">{{ formatTime(msg.timestamp) }}</span>
-              @if (isSentByMe(msg) && chatId !== 'group') {
-              <span class="read-receipt" [class.read]="msg.read">
-                @if (msg.read) {
-                <i class="bi bi-check-all"></i>
-                } @else {
-                <i class="bi bi-check"></i>
-                }
-              </span>
-              }
+            <div class="document-details">
+              <span class="document-name" [title]="msg.content">{{ msg.content }}</span>
+              <a [href]="msg.mediaData" [download]="msg.content" class="document-download-btn">
+                <i class="bi bi-download"></i> Download
+              </a>
             </div>
           </div>
+          }
+
+          @if (msg.content && msg.mediaType !== 'document') {
+          <p class="message-text">{{ msg.content }}</p>
+          }
+
+          <div class="bubble-meta">
+            <span class="message-time">{{ formatTime(msg.timestamp) }}</span>
+            @if (isSentByMe(msg) && chatId !== 'group') {
+            <span class="read-receipt" [class.read]="msg.read">
+              @if (msg.read) {
+              <i class="bi bi-check-all text-success"></i>
+              } @else {
+              <i class="bi bi-check"></i>
+              }
+            </span>
+            }
+          </div>
         </div>
+
+        <!-- Message Deletion Button Overlay for sent messages -->
+        @if (isSentByMe(msg)) {
+        <button
+          class="btn btn-outline-danger border-0 p-0 rounded-circle delete-msg-btn position-absolute top-50 translate-middle-y shadow-sm"
+          (click)="deleteMessage(msg.id)" title="Delete message">
+          <i class="bi bi-trash3-fill"></i>
+        </button>
+        }
+      </div>
+    </div>
+    }
+  </div>
+
+  <!-- File Attachment preview -->
+  @if (selectedFileBase64()) {
+  <div class="media-preview-container">
+    <div class="preview-card">
+      @if (selectedFileType() === 'image') {
+      <img [src]="selectedFileBase64()" alt="Preview" class="preview-thumb" />
+      } @else if (selectedFileType() === 'video') {
+      <div class="preview-video-placeholder">
+        <i class="bi bi-play-btn-fill"></i>
+      </div>
+      } @else {
+      <div class="preview-video-placeholder" style="background: rgba(0, 168, 132, 0.1); color: var(--accent-emerald);">
+        <i class="bi bi-file-earmark-arrow-up-fill"></i>
       </div>
       }
-    </div>
-
-    @if (selectedFileBase64()) {
-    <div class="media-preview-container">
-      <div class="preview-card">
-        @if (selectedFileType() === 'image') {
-        <img [src]="selectedFileBase64()" alt="Preview" class="preview-thumb" />
-        } @else if (selectedFileType() === 'video') {
-        <div class="preview-video-placeholder">
-          <i class="bi bi-play-btn-fill"></i>
-        </div>
-        } @else {
-        <div class="preview-video-placeholder" style="background: rgba(0, 168, 132, 0.1); color: var(--accent-emerald);">
-          <i class="bi bi-file-earmark-arrow-up-fill"></i>
-        </div>
-        }
-        <div class="preview-info">
-          <span class="preview-name">{{ selectedFileName() }}</span>
-          <span class="preview-size">Ready to send</span>
-        </div>
-        <button class="clear-preview-btn" (click)="clearSelectedFile()" title="Cancel attachment">
-          <i class="bi bi-x-circle-fill"></i>
-        </button>
+      <div class="preview-info">
+        <span class="preview-name">{{ selectedFileName() }}</span>
+        <span class="preview-size">Ready to send</span>
       </div>
-    </div>
-    }
-
-    @if (showEmojiPicker()) {
-    <div class="emoji-picker-container">
-      <div class="emoji-grid">
-        @for (emoji of emojis; track emoji) {
-        <button type="button" class="emoji-btn" (click)="addEmoji(emoji)">
-          {{ emoji }}
-        </button>
-        }
-      </div>
-    </div>
-    }
-
-    <div class="message-input-area">
-      <input type="file" #fileInput (change)="onFileSelected($event)" style="display: none;"
-        accept="image/*,video/*,.pdf,.doc,.docx,.txt,.zip" />
-
-      <div class="input-toolbar">
-        <button class="toolbar-btn" (click)="triggerFileSelect()" title="Attach Image/Video">
-          <i class="bi bi-paperclip"></i>
-        </button>
-        <button class="toolbar-btn" [class.active]="showEmojiPicker()" (click)="toggleEmojiPicker()" title="Emoji Picker">
-          <i class="bi bi-emoji-smile"></i>
-        </button>
-      </div>
-
-      <div class="input-field-wrapper">
-        <textarea id="message-input" class="message-textarea" placeholder="Type a message..." [ngModel]="messageText()"
-          (ngModelChange)="messageText.set($event)" (keydown)="onKeyDown($event)" rows="1"
-          [disabled]="isSending()"></textarea>
-      </div>
-
-      <button class="send-btn" [class.active]="messageText().trim() || selectedFileBase64()"
-        [disabled]="(!messageText().trim() && !selectedFileBase64()) || isSending()" (click)="sendMessage()"
-        id="send-button" title="Send Message">
-        @if (isSending()) {
-        <span class="send-spinner"></span>
-        } @else {
-        <span class="send-icon"><i class="bi bi-send-fill"></i></span>
-        }
+      <button class="clear-preview-btn" (click)="clearSelectedFile()" title="Cancel attachment">
+        <i class="bi bi-x-circle-fill text-danger"></i>
       </button>
     </div>
+  </div>
+  }
+
+  <!-- ngx-emoji-mart Picker Component Container -->
+  @if (showEmojiPicker()) {
+  <div class="emoji-picker-container shadow-lg"
+    style="border-top: 1px solid rgba(255,255,255,0.08); background: #121b22; z-index: 10;">
+    <emoji-mart (emojiSelect)="addEmojiMart($event)" theme="dark"></emoji-mart>
+  </div>
+  }
+
+  <!-- Bottom Message Text Area & toolbar -->
+  <div class="message-input-area">
+    <input type="file" #fileInput (change)="onFileSelected($event)" style="display: none;"
+      accept="image/*,video/*,.pdf,.doc,.docx,.txt,.zip" />
+
+    <div class="input-toolbar">
+      <button class="toolbar-btn" (click)="triggerFileSelect()" title="Attach Image/Video">
+        <i class="bi bi-paperclip"></i>
+      </button>
+      <button class="toolbar-btn" [class.active]="showEmojiPicker()" (click)="toggleEmojiPicker()" title="Emoji Picker">
+        <i class="bi bi-emoji-smile"></i>
+      </button>
+    </div>
+
+    <div class="input-field-wrapper">
+      <textarea id="message-input" class="message-textarea" placeholder="Type a message..." [ngModel]="messageText()"
+        (ngModelChange)="messageText.set($event)" (keydown)="onKeyDown($event)" rows="1"
+        [disabled]="isSending()"></textarea>
+    </div>
+
+    <button class="send-btn" [class.active]="messageText().trim() || selectedFileBase64()"
+      [disabled]="(!messageText().trim() && !selectedFileBase64()) || isSending()" (click)="sendMessage()"
+      id="send-button" title="Send Message">
+      @if (isSending()) {
+      <span class="send-spinner"></span>
+      } @else {
+      <span class="send-icon"><i class="bi bi-send-fill text-white"></i></span>
+      }
+    </button>
+  </div>
+  }
   }
 </div>

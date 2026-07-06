@@ -577,3 +577,40 @@
     grid-template-columns: repeat(8, 1fr);
   }
 }
+
+/* Message Hover Actions (Delete Message) */
+.delete-msg-btn {
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease, color 0.15s ease, transform 0.15s ease;
+  color: var(--text-muted);
+  background: transparent;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 5;
+  border: none;
+}
+
+.delete-msg-btn:hover {
+  color: #f87171 !important;
+  transform: scale(1.15);
+}
+
+.message-bubble-wrap:hover .delete-msg-btn {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* Hover position placements relative to bubble */
+.received .delete-msg-btn {
+  left: 102%;
+  margin-left: 4px;
+}
+
+.sent .delete-msg-btn {
+  right: 102%;
+  margin-right: 4px;
+}

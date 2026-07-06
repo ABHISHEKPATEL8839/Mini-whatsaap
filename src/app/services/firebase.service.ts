@@ -349,22 +349,48 @@ export class FirebaseService {
     }
 
     const savedGroups = localStorage.getItem(this.KEY_GROUPS);
-    this.mockGroups = savedGroups ? JSON.parse(savedGroups) : [];
+    let parsedGroups: ChatGroup[] = savedGroups ? JSON.parse(savedGroups) : [];
+    parsedGroups = parsedGroups.filter(g => 
+      !g.name.toLowerCase().includes('company') && 
+      !g.name.toLowerCase().includes('compant')
+    );
+    this.mockGroups = parsedGroups;
+    localStorage.setItem(this.KEY_GROUPS, JSON.stringify(this.mockGroups));
     this._groups$.next(this.mockGroups);
 
     this._invitations$.next(this.mockInvitations);
     this._users$.next(this.mockUsers);
     this._messages$.next(this.mockMessages);
     this._authLoaded$.next(true);
+
+    window.addEventListener('storage', (event) => {
+      if (this.isMockMode) {
+        if (event.key === this.KEY_USERS) {
+          this.mockUsers = event.newValue ? JSON.parse(event.newValue) : [];
+          this._users$.next([...this.mockUsers]);
+        } else if (event.key === this.KEY_MESSAGES) {
+          this.mockMessages = event.newValue ? JSON.parse(event.newValue) : [];
+          this._messages$.next([...this.mockMessages]);
+        } else if (event.key === this.KEY_GROUPS) {
+          this.mockGroups = event.newValue ? JSON.parse(event.newValue) : [];
+          this._groups$.next([...this.mockGroups]);
+        } else if (event.key === this.KEY_INVITATIONS) {
+          this.mockInvitations = event.newValue ? JSON.parse(event.newValue) : [];
+          this._invitations$.next([...this.mockInvitations]);
+        }
+      }
+    });
   }
 
   private saveMock() {
     localStorage.setItem(this.KEY_MESSAGES, JSON.stringify(this.mockMessages));
     localStorage.setItem(this.KEY_USERS, JSON.stringify(this.mockUsers));
     localStorage.setItem(this.KEY_INVITATIONS, JSON.stringify(this.mockInvitations));
+    localStorage.setItem(this.KEY_GROUPS, JSON.stringify(this.mockGroups));
     this._messages$.next([...this.mockMessages]);
     this._users$.next([...this.mockUsers]);
     this._invitations$.next([...this.mockInvitations]);
+    this._groups$.next([...this.mockGroups]);
   }
 
   /* ================= AUTHENTICATION ================= */
@@ -640,13 +666,14 @@ export class FirebaseService {
 
     if (!this.isMockMode && this.db) {
       try {
-        const docRef = await addDoc(collection(this.db, 'groups'), {
+        const customId = 'group_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7);
+        await setDoc(doc(this.db, 'groups', customId), {
+          id: customId,
           name: groupName,
           createdAt: Date.now(),
           createdBy: me.uid,
           members: groupMembers
         });
-        await updateDoc(docRef, { id: docRef.id });
       } catch (err) {
         console.warn('Firebase createGroup failed, falling back to mock:', err);
       }
@@ -671,7 +698,8 @@ export class FirebaseService {
     return this._messages$.pipe(
       map(msgs =>
         msgs.filter(m => {
-          if (chatId === 'group' || chatId.startsWith('group_')) {
+          const isGroup = chatId === 'group' || chatId.startsWith('group_') || this._groups$.value.some(g => g.id === chatId);
+          if (isGroup) {
             return m.receiverId === chatId;
           }
 
@@ -833,6 +861,89 @@ export class FirebaseService {
       this.saveMock();
     } else if (this.db) {
       await deleteDoc(doc(this.db, 'invitations', id));
+    }
+  }
+
+  async deleteMessage(messageId: string) {
+    if (this.isMockMode) {
+      this.mockMessages = this.mockMessages.filter(m => m.id !== messageId);
+      this.saveMock();
+    } else if (this.db) {
+      try {
+        await deleteDoc(doc(this.db, 'messages', messageId));
+      } catch (err) {
+        console.error('Failed to delete message', err);
+      }
+    }
+  }
+
+  async updateGroup(groupId: string, name: string, members: string[]) {
+    const groupName = name.trim();
+    if (!groupName) return;
+    if (this.isMockMode) {
+      const g = this.mockGroups.find(x => x.id === groupId);
+      if (g) {
+        g.name = groupName;
+        g.members = members;
+        this.saveMock();
+      }
+    } else if (this.db) {
+      try {
+        await updateDoc(doc(this.db, 'groups', groupId), {
+          name: groupName,
+          members: members
+        });
+      } catch (err) {
+        console.error('Failed to update group', err);
+      }
+    }
+  }
+
+  async deleteGroup(groupId: string) {
+    if (this.isMockMode) {
+      this.mockGroups = this.mockGroups.filter(g => g.id !== groupId);
+      this.saveMock();
+    } else if (this.db) {
+      try {
+        await deleteDoc(doc(this.db, 'groups', groupId));
+      } catch (err) {
+        console.error('Failed to delete group', err);
+      }
+    }
+  }
+
+  async deleteFriend(friendUid: string) {
+    const me = this._currentUser$.value;
+    if (!me) return;
+    if (this.isMockMode) {
+      this.mockInvitations = this.mockInvitations.filter(i => 
+        !((i.senderUid === me.uid && i.receiverUid === friendUid && i.status === 'accepted') ||
+          (i.senderUid === friendUid && i.receiverUid === me.uid && i.status === 'accepted'))
+      );
+      this.saveMock();
+    } else if (this.db) {
+      try {
+        const q = query(
+          collection(this.db, 'invitations'),
+          where('status', '==', 'accepted')
+        );
+        const snap = await getDocs(q);
+        const batch = writeBatch(this.db);
+        let count = 0;
+        snap.forEach((docSnap) => {
+          const data = docSnap.data() as Invitation;
+          if ((data.senderUid === me.uid && data.receiverUid === friendUid) ||
+              (data.senderUid === friendUid && data.receiverUid === me.uid)) {
+            batch.delete(docRef(this.db!, 'invitations', docSnap.id));
+            count++;
+          }
+        });
+        if (count > 0) {
+          await batch.commit();
+        }
+      } catch (err) {
+        console.error('Failed to delete friend connection', err);
+      }
     }
   }
 }

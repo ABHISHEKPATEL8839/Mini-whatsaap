@@ -13,7 +13,7 @@ import { FirebaseService, UserProfile, ChatGroup, Invitation } from '../../servi
 })
 export class SidebarComponent implements OnInit, OnDestroy {
   @Input() currentUser: UserProfile | null = null;
-  @Input() activeChatId = 'group';
+  @Input() activeChatId = '';
   @Output() chatSelected = new EventEmitter<string>();
   @Output() logoutRequested = new EventEmitter<void>();
   viewMode = signal<'chats' | 'profile'>('chats');
@@ -22,10 +22,14 @@ export class SidebarComponent implements OnInit, OnDestroy {
   editingBio = signal(false);
   newName = signal('');
   editingName = signal(false);
-  newPassword = signal('');
-  editingPassword = signal(false);
   showCreateGroup = signal(false);
   newGroupName = signal('');
+  showPendingRequests = signal(false);
+
+  // Group editing state
+  editingGroupId = signal<string | null>(null);
+  editingGroupName = signal<string>('');
+  editingGroupMembers = signal<string[]>([]);
 
   // Group selection state
   selectedGroupMembers = signal<string[]>([]);
@@ -189,17 +193,57 @@ export class SidebarComponent implements OnInit, OnDestroy {
     this.editingName.set(false);
   }
 
-  async savePassword() {
-    const pass = this.newPassword().trim();
-    if (pass.length >= 6) {
-      await this.firebaseService.updateProfileData(
-        this.currentUser?.displayName || '',
-        this.currentUser?.bio || '',
-        pass
-      );
-      this.newPassword.set('');
+  startEditGroup(group: ChatGroup) {
+    this.editingGroupId.set(group.id);
+    this.editingGroupName.set(group.name);
+    this.editingGroupMembers.set(group.members || []);
+    this.showCreateGroup.set(false);
+    this.showAddFriend.set(false);
+    this.showPendingRequests.set(false);
+  }
+
+  cancelEditGroup() {
+    this.editingGroupId.set(null);
+    this.editingGroupName.set('');
+    this.editingGroupMembers.set([]);
+  }
+
+  isEditingGroupMemberSelected(uid: string): boolean {
+    return this.editingGroupMembers().includes(uid);
+  }
+
+  toggleEditingGroupMemberSelection(uid: string) {
+    this.editingGroupMembers.update(members =>
+      members.includes(uid) ? members.filter(id => id !== uid) : [...members, uid]
+    );
+  }
+
+  async saveGroupEdit() {
+    const groupId = this.editingGroupId();
+    const name = this.editingGroupName().trim();
+    if (groupId && name) {
+      const members = this.editingGroupMembers();
+      await this.firebaseService.updateGroup(groupId, name, members);
+      this.cancelEditGroup();
     }
-    this.editingPassword.set(false);
+  }
+
+  async deleteGroup(groupId: string) {
+    if (confirm('Are you sure you want to delete this group? All messages in this group will be inaccessible.')) {
+      await this.firebaseService.deleteGroup(groupId);
+      if (this.activeChatId === groupId) {
+        this.chatSelected.emit('');
+      }
+    }
+  }
+
+  async removeFriend(friendUid: string) {
+    if (confirm('Are you sure you want to remove this friend? You will not be able to chat with them until you connect again.')) {
+      await this.firebaseService.deleteFriend(friendUid);
+      if (this.activeChatId === friendUid) {
+        this.chatSelected.emit('');
+      }
+    }
   }
 
   isMemberSelected(uid: string): boolean {

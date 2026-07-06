@@ -240,7 +240,7 @@
   gap: 10px;
 }
 
-.create-group-form input {
+.create-group-form input:not([type="checkbox"]) {
   background: rgba(0, 0, 0, 0.2);
   border: 1px solid var(--border-light);
   border-radius: 6px;
@@ -252,8 +252,26 @@
   box-sizing: border-box;
 }
 
-.create-group-form input:focus {
+.create-group-form input:not([type="checkbox"]):focus {
   border-color: var(--accent-emerald);
+}
+
+.member-select-row {
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+  padding: 4px 8px;
+  border-radius: 6px;
+}
+
+.member-select-row:hover {
+  background-color: rgba(255, 255, 255, 0.05);
+}
+
+.member-select-row input[type="checkbox"] {
+  width: 16px !important;
+  height: 16px !important;
+  margin: 0 !important;
+  cursor: pointer;
 }
 
 .create-group-actions {
@@ -688,3 +706,34 @@
 .clickable-profile:hover {
   transform: scale(1.04);
 }
+
+/* --- HOVER ACTION PANELS FOR GROUP & FRIEND CRUD --- */
+.group-actions-panel,
+.friend-actions-panel {
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease, transform 0.15s ease;
+  z-index: 5;
+}
+
+.chat-item:hover .group-actions-panel,
+.chat-item:hover .friend-actions-panel {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.group-actions-panel button,
+.friend-actions-panel button {
+  transition: transform 0.15s ease, color 0.15s ease;
+}
+
+.group-actions-panel button:hover {
+  color: #fbbf24 !important; /* warning color */
+  transform: scale(1.2);
+}
+
+.friend-actions-panel button:hover {
+  color: #f87171 !important; /* danger color */
+  transform: scale(1.2);
+}
+

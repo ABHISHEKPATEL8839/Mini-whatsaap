@@ -1,5 +1,5 @@
 import { Component, OnInit, signal, computed } from '@angular/core';
-import { FirebaseService, UserProfile, Invitation } from './services/firebase.service';
+import { FirebaseService, UserProfile, Invitation, ChatGroup } from './services/firebase.service';
 import { AuthComponent } from './components/auth/auth';
 import { SidebarComponent } from './components/sidebar/sidebar';
 import { ChatComponent } from './components/chat/chat';
@@ -14,16 +14,19 @@ import { ChatComponent } from './components/chat/chat';
 export class App implements OnInit {
   loadingAuth = signal(true);
   currentUser = signal<UserProfile | null>(null);
-  activeChatId = signal<string>('group');
+  activeChatId = signal<string>('');
   users = signal<UserProfile[]>([]);
   invitations = signal<Invitation[]>([]);
+  groups = signal<ChatGroup[]>([]);
   mobileChatActive = signal(false);
 
   isLoggedIn = computed(() => this.currentUser() !== null);
 
   activeChatPartner = computed<UserProfile | null>(() => {
     const chatId = this.activeChatId();
-    if (chatId === 'group' || chatId.startsWith('group_')) return null;
+    if (!chatId) return null;
+    const isGroup = chatId === 'group' || chatId.startsWith('group_') || this.groups().some(g => g.id === chatId);
+    if (isGroup) return null;
     return this.users().find(u => u.uid === chatId) || null;
   });
 
@@ -50,6 +53,10 @@ export class App implements OnInit {
 
     this.firebaseService.invitations$.subscribe(allInvites => {
       this.invitations.set(allInvites);
+    });
+
+    this.firebaseService.groups$.subscribe(allGroups => {
+      this.groups.set(allGroups);
     });
   }
 

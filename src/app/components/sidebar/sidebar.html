@@ -36,11 +36,26 @@
       <div class="list-section-title">
         <span>GROUPS & CHANNELS</span>
         <div class="d-flex align-items-center">
-          <button class="add-group-btn me-2" (click)="showCreateGroup.update(v => !v); showAddFriend.set(false)" title="Create New Group">
+          <button class="add-group-btn me-2"
+            (click)="showCreateGroup.update(v => !v); showAddFriend.set(false); showPendingRequests.set(false); cancelEditGroup();"
+            title="Create New Group">
             <i class="bi bi-plus-lg"></i> Group
           </button>
-          <button class="add-group-btn bg-success bg-opacity-25 border-success text-success" (click)="showAddFriend.update(v => !v); showCreateGroup.set(false)" title="Add Friend by Email">
+          <button class="add-group-btn bg-success bg-opacity-25 border-success text-success me-2"
+            (click)="showAddFriend.update(v => !v); showCreateGroup.set(false); showPendingRequests.set(false); cancelEditGroup();"
+            title="Add Friend by Email">
             <i class="bi bi-person-plus-fill"></i> Add Friend
+          </button>
+          <button class="add-group-btn bg-warning bg-opacity-25 border-warning text-warning position-relative"
+            (click)="showPendingRequests.update(v => !v); showCreateGroup.set(false); showAddFriend.set(false); cancelEditGroup();"
+            title="Check Pending Requests">
+            <i class="bi bi-bell-fill"></i> Requests
+            @if (receivedPendingInvitations().length > 0) {
+            <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger"
+              style="font-size: 0.65rem; padding: 0.25em 0.4em;">
+              {{ receivedPendingInvitations().length }}
+            </span>
+            }
           </button>
         </div>
       </div>
@@ -50,20 +65,22 @@
       <div class="create-group-form animate-fade-in">
         <input type="text" placeholder="Enter group name..." [ngModel]="newGroupName()"
           (ngModelChange)="newGroupName.set($event)" (keydown.enter)="createGroup()" maxlength="25" />
-        
+
         <!-- Select participants list -->
         <label class="text-secondary small fw-bold mt-2 mb-1">Select Participants (Contacts)</label>
-        <div class="participants-list border border-secondary border-opacity-25 rounded p-2 overflow-y-auto" style="max-height: 120px; background: rgba(0,0,0,0.2);">
+        <div class="participants-list border border-secondary border-opacity-25 rounded p-2 overflow-y-auto"
+          style="max-height: 120px; background: rgba(0,0,0,0.2);">
           @for (friend of friends(); track friend.uid) {
-            <div class="form-check d-flex align-items-center gap-2 mb-1">
-              <input type="checkbox" class="form-check-input" [id]="'member-' + friend.uid"
-                [checked]="isMemberSelected(friend.uid)" (click)="toggleMemberSelection(friend.uid)" style="cursor: pointer;" />
-              <label class="form-check-label text-white small" [for]="'member-' + friend.uid" style="cursor: pointer; user-select: none;">
-                {{ friend.displayName }}
-              </label>
-            </div>
+          <div class="member-select-row d-flex align-items-center gap-2 mb-1"
+            (click)="toggleMemberSelection(friend.uid)">
+            <input type="checkbox" [checked]="isMemberSelected(friend.uid)" (click)="$event.stopPropagation()"
+              style="cursor: pointer;" />
+            <span class="text-white small" style="user-select: none;">
+              {{ friend.displayName }}
+            </span>
+          </div>
           } @empty {
-            <div class="text-muted small text-center py-2">No friends available to add. Add friends by email first!</div>
+          <div class="text-muted small text-center py-2">No friends available. Add contacts first!</div>
           }
         </div>
 
@@ -74,132 +91,206 @@
       </div>
       }
 
+      <!-- Edit Group Inline Form -->
+      @if (editingGroupId()) {
+      <div
+        class="create-group-form animate-fade-in p-3 bg-dark bg-opacity-50 border border-warning border-opacity-25 rounded mb-2 mx-2">
+        <label class="text-warning small fw-bold mb-1"><i class="bi bi-pencil-square"></i> Modify Group Details</label>
+        <input type="text" placeholder="Group name..." [ngModel]="editingGroupName()"
+          (ngModelChange)="editingGroupName.set($event)" maxlength="25"
+          class="form-control form-control-sm bg-dark text-white border-secondary mb-2" />
+
+        <label class="text-secondary small fw-bold mb-1">Manage Participants</label>
+        <div class="participants-list border border-secondary border-opacity-25 rounded p-2 overflow-y-auto mb-2"
+          style="max-height: 120px; background: rgba(0,0,0,0.2);">
+          @for (friend of friends(); track friend.uid) {
+          <div class="member-select-row d-flex align-items-center gap-2 mb-1"
+            (click)="toggleEditingGroupMemberSelection(friend.uid)">
+            <input type="checkbox" [checked]="isEditingGroupMemberSelected(friend.uid)"
+              (click)="$event.stopPropagation()" style="cursor: pointer;" />
+            <span class="text-white small" style="user-select: none;">
+              {{ friend.displayName }}
+            </span>
+          </div>
+          }
+        </div>
+        <div class="create-group-actions d-flex gap-2 justify-content-end">
+          <button class="btn btn-sm btn-outline-secondary py-0" style="font-size: 0.75rem;"
+            (click)="cancelEditGroup()">Cancel</button>
+          <button class="btn btn-sm btn-warning py-0 text-dark fw-bold" style="font-size: 0.75rem;"
+            (click)="saveGroupEdit()" [disabled]="!editingGroupName().trim()">Update</button>
+        </div>
+      </div>
+      }
+
       <!-- Add Friend Inline Form -->
       @if (showAddFriend()) {
-      <div class="create-group-form animate-fade-in p-3 bg-dark bg-opacity-50 border border-secondary border-opacity-25 rounded mb-2 mx-2">
+      <div
+        class="create-group-form animate-fade-in p-3 bg-dark bg-opacity-50 border border-secondary border-opacity-25 rounded mb-2 mx-2">
         <label class="text-secondary small fw-bold mb-1">Add User by Email</label>
         <div class="d-flex gap-2">
           <input type="email" placeholder="example@gmail.com" [ngModel]="inviteEmail()"
-            (ngModelChange)="inviteEmail.set($event)" (keydown.enter)="sendInvite()" 
+            (ngModelChange)="inviteEmail.set($event)" (keydown.enter)="sendInvite()"
             class="form-control form-control-sm bg-dark text-white border-secondary" [disabled]="inviteLoading()" />
-          <button class="btn btn-success btn-sm px-3" (click)="sendInvite()" [disabled]="inviteLoading() || !inviteEmail().trim()">
+          <button class="btn btn-success btn-sm px-3" (click)="sendInvite()"
+            [disabled]="inviteLoading() || !inviteEmail().trim()">
             @if (inviteLoading()) {
-              <span class="spinner-border spinner-border-sm" role="status"></span>
+            <span class="spinner-border spinner-border-sm" role="status"></span>
             } @else {
-              Send
+            Send
             }
           </button>
         </div>
         @if (inviteError()) {
-          <div class="text-danger small mt-1"><i class="bi bi-exclamation-circle-fill"></i> {{ inviteError() }}</div>
+        <div class="text-danger small mt-1"><i class="bi bi-exclamation-circle-fill"></i> {{ inviteError() }}</div>
         }
         @if (inviteSuccess()) {
-          <div class="text-success small mt-1"><i class="bi bi-check-circle-fill"></i> {{ inviteSuccess() }}</div>
+        <div class="text-success small mt-1"><i class="bi bi-check-circle-fill"></i> {{ inviteSuccess() }}</div>
         }
       </div>
       }
 
-      <!-- Invitations List -->
-      @if (receivedPendingInvitations().length > 0 || sentInvitations().length > 0) {
-        <div class="list-section-title mt-2">
-          <span>PENDING REQUESTS</span>
+      <!-- Pending Requests Overlay List -->
+      @if (showPendingRequests()) {
+      <div
+        class="create-group-form animate-fade-in p-3 bg-dark bg-opacity-50 border border-warning border-opacity-25 rounded mb-3 mx-2">
+        <div
+          class="d-flex justify-content-between align-items-center mb-2 border-bottom border-secondary border-opacity-20 pb-1">
+          <label class="text-warning small fw-bold mb-0"><i class="bi bi-bell-fill"></i> Connection Requests</label>
+          <button class="btn-close btn-close-white" style="font-size: 0.65rem;"
+            (click)="showPendingRequests.set(false)"></button>
         </div>
-        <div class="px-2 pb-2 overflow-y-auto" style="max-height: 200px;">
-          <!-- Received pending requests -->
+        <div class="overflow-y-auto px-1" style="max-height: 220px;">
+          <!-- Received requests -->
           @for (invite of receivedPendingInvitations(); track invite.id) {
-            <div class="card bg-dark text-white border-success mb-2 p-2" style="font-size: 0.85rem;">
-              <div class="d-flex justify-content-between align-items-center mb-1">
-                <span class="text-success fw-bold"><i class="bi bi-box-arrow-in-down"></i> Received Request</span>
-                <span class="text-muted small" style="font-size: 0.75rem;">Pending</span>
-              </div>
-              <div class="mb-2"><strong>{{ invite.senderName }}</strong> ({{ invite.senderEmail }}) wants to chat.</div>
-              <div class="d-flex gap-2">
-                <button class="btn btn-success btn-sm flex-fill py-0" style="font-size: 0.75rem;" (click)="acceptInvite(invite.id)">Accept</button>
-                <button class="btn btn-outline-danger btn-sm flex-fill py-0 text-white bg-danger bg-opacity-25" style="font-size: 0.75rem;" (click)="rejectInvite(invite.id)">Reject</button>
-              </div>
+          <div class="card bg-dark text-white border-success mb-2 p-2" style="font-size: 0.85rem;">
+            <div class="d-flex justify-content-between align-items-center mb-1">
+              <span class="text-success fw-bold"><i class="bi bi-box-arrow-in-down"></i> Received</span>
+              <span class="text-muted small" style="font-size: 0.75rem;">Pending</span>
             </div>
+            <div class="mb-2"><strong>{{ invite.senderName }}</strong> ({{ invite.senderEmail }}) wants to chat.</div>
+            <div class="d-flex gap-2">
+              <button class="btn btn-success btn-sm flex-fill py-1" style="font-size: 0.75rem;"
+                (click)="acceptInvite(invite.id)">Accept</button>
+              <button class="btn btn-outline-danger btn-sm flex-fill py-1 text-white bg-danger bg-opacity-25"
+                style="font-size: 0.75rem;" (click)="rejectInvite(invite.id)">Reject</button>
+            </div>
+          </div>
+          } @empty {
+          <div class="text-muted small text-center py-2 border-bottom border-secondary border-opacity-10">No received
+            invitations.</div>
           }
 
-          <!-- Sent requests (pending / rejected) -->
+          <!-- Sent requests -->
+          <div class="text-secondary small fw-bold mt-3 mb-1">SENT REQUESTS</div>
           @for (invite of sentInvitations(); track invite.id) {
-            @if (invite.status !== 'accepted') {
-              <div class="card bg-dark text-white mb-2 p-2" [class.border-danger]="invite.status === 'rejected'" [class.border-secondary]="invite.status === 'pending'" style="font-size: 0.85rem;">
-                <div class="d-flex justify-content-between align-items-center mb-1">
-                  <span class="fw-bold" [class.text-danger]="invite.status === 'rejected'" [class.text-muted]="invite.status === 'pending'">
-                    <i class="bi bi-box-arrow-up"></i> Sent Request
-                  </span>
-                  <span class="badge" [class.bg-danger]="invite.status === 'rejected'" [class.bg-secondary]="invite.status === 'pending'" style="font-size: 0.7rem;">
-                    {{ invite.status | uppercase }}
-                  </span>
-                </div>
-                <div class="mb-2 text-truncate" title="{{ invite.receiverEmail }}">To: <strong>{{ invite.receiverEmail }}</strong></div>
-                <div class="d-flex justify-content-end">
-                  @if (invite.status === 'rejected') {
-                    <button class="btn btn-outline-light btn-sm py-0" style="font-size: 0.75rem;" (click)="deleteInvite(invite.id)">Dismiss</button>
-                  } @else {
-                    <button class="btn btn-outline-secondary btn-sm py-0 text-white bg-secondary bg-opacity-25" style="font-size: 0.75rem;" (click)="deleteInvite(invite.id)">Cancel</button>
-                  }
-                </div>
-              </div>
-            }
+          @if (invite.status !== 'accepted') {
+          <div class="card bg-dark text-white mb-2 p-2" [class.border-danger]="invite.status === 'rejected'"
+            [class.border-secondary]="invite.status === 'pending'" style="font-size: 0.85rem;">
+            <div class="d-flex justify-content-between align-items-center mb-1">
+              <span class="fw-bold" [class.text-danger]="invite.status === 'rejected'"
+                [class.text-muted]="invite.status === 'pending'">
+                <i class="bi bi-box-arrow-up"></i> Sent Request
+              </span>
+              <span class="badge" [class.bg-danger]="invite.status === 'rejected'"
+                [class.bg-secondary]="invite.status === 'pending'" style="font-size: 0.7rem;">
+                {{ invite.status | uppercase }}
+              </span>
+            </div>
+            <div class="mb-2 text-truncate" title="{{ invite.receiverEmail }}">To: <strong>{{ invite.receiverEmail
+                }}</strong></div>
+            <div class="d-flex justify-content-end">
+              @if (invite.status === 'rejected') {
+              <button class="btn btn-outline-light btn-sm py-0" style="font-size: 0.75rem;"
+                (click)="deleteInvite(invite.id)">Dismiss</button>
+              } @else {
+              <button class="btn btn-outline-secondary btn-sm py-0 text-white bg-secondary bg-opacity-25"
+                style="font-size: 0.75rem;" (click)="deleteInvite(invite.id)">Cancel</button>
+              }
+            </div>
+          </div>
+          }
+          } @empty {
+          <div class="text-muted small text-center py-1">No pending sent requests.</div>
           }
         </div>
+      </div>
       }
 
-      <!-- Pinned Global Chat -->
-      <div class="chat-item pinned" [class.active]="activeChatId === 'group'" (click)="selectChat('group')">
-        <div class="chat-avatar-wrap group-avatar">
-          <div class="chat-avatar">
-            <i class="bi bi-people-fill"></i>
-          </div>
-        </div>
-        <div class="chat-details">
-          <div class="chat-header-row">
-            <span class="chat-name">Global Circle</span>
-            <span class="chat-badge">GLOBAL</span>
-          </div>
-          <span class="chat-sub">Everyone in the friend circle</span>
-        </div>
-      </div>
-
+      <!-- List of Groups (no Global Chat) -->
       @for (g of filteredGroups(); track g.id) {
-      <div class="chat-item" [class.active]="activeChatId === g.id" (click)="selectChat(g.id)">
-        <div class="chat-avatar-wrap group-avatar-style-dynamic" [style.background-color]="getUserColor(g.id)">
-          <div class="chat-avatar-initials">
-            {{ getUserInitials(g.name) }}
+      <div class="chat-item position-relative d-flex align-items-center justify-content-between"
+        [class.active]="activeChatId === g.id">
+        <div class="d-flex align-items-center flex-grow-1 min-w-0" (click)="selectChat('group_'+g.id)"
+          style="cursor: pointer;">
+          <div class="chat-avatar-wrap group-avatar-style-dynamic flex-shrink-0 m-2"
+            [style.background-color]="getUserColor(g.id)">
+            <div class="chat-avatar-initials">
+              {{ getUserInitials(g.name) }}
+            </div>
+          </div>
+          <div class="chat-details text-truncate min-w-0">
+            <div class="chat-header-row">
+              <span class="chat-name">{{ g.name }}</span>
+              <span class="chat-badge group">GROUP</span>
+            </div>
+            <span class="chat-sub">Custom group channel</span>
           </div>
         </div>
-        <div class="chat-details">
-          <div class="chat-header-row">
-            <span class="chat-name">{{ g.name }}</span>
-            <span class="chat-badge group">GROUP</span>
-          </div>
-          <span class="chat-sub">Custom group channel</span>
+
+        <!-- Group CRUD Actions for Creators -->
+        @if (g.createdBy === currentUser?.uid) {
+        <div class="group-actions-panel d-flex gap-1 pe-2 flex-shrink-0">
+          <button class="btn btn-outline-warning border-0 p-1 rounded-circle"
+            (click)="$event.stopPropagation(); startEditGroup(g);" title="Edit Group"
+            style="width: 26px; height: 26px; display: flex; align-items: center; justify-content: center; background: transparent;">
+            <i class="bi bi-pencil-fill" style="font-size: 0.78rem;"></i>
+          </button>
+          <button class="btn btn-outline-danger border-0 p-1 rounded-circle"
+            (click)="$event.stopPropagation(); deleteGroup(g.id);" title="Delete Group"
+            style="width: 26px; height: 26px; display: flex; align-items: center; justify-content: center; background: transparent;">
+            <i class="bi bi-trash3-fill" style="font-size: 0.78rem;"></i>
+          </button>
         </div>
+        }
       </div>
       }
 
+      <!-- Friends List Section -->
       <div class="list-section-title">FRIENDS ({{ filteredUsers().length }})</div>
       <div class="friends-list-wrapper">
         @for (user of filteredUsers(); track user.uid) {
-        <div class="chat-item" [class.active]="activeChatId === user.uid" (click)="selectChat(user.uid)">
-          <div class="chat-avatar-wrap">
-            <div class="chat-avatar" [style.background-color]="getUserColor(user.uid)">
-              {{ getUserInitials(user.displayName) }}
+        <div class="chat-item position-relative d-flex align-items-center justify-content-between"
+          [class.active]="activeChatId === user.uid">
+          <div class="d-flex align-items-center flex-grow-1 min-w-0 m-2" (click)="selectChat(user.uid)"
+            style="cursor: pointer;">
+            <div class="chat-avatar-wrap">
+              <div class="chat-avatar" [style.background-color]="getUserColor(user.uid)">
+                {{ getUserInitials(user.displayName) }}
+              </div>
+              <span class="live-dot" [class.status-online]="user.status === 'online'"
+                [class.status-offline]="user.status === 'offline'"></span>
             </div>
-            <span class="live-dot" [class.status-online]="user.status === 'online'"
-              [class.status-offline]="user.status === 'offline'"></span>
+            <div class="chat-details text-truncate min-w-0 m-2">
+              <div class="chat-header-row ">
+                <span class="chat-name">{{ user.displayName }}</span>
+                @if ((getUnreadCount(user.uid) | async); as count) {
+                @if (count > 0) {
+                <span class="unread-badge">{{ count }}</span>
+                }
+                }
+              </div>
+              <span class="chat-sub">{{ user.bio || 'Hey there! I am using Abhi WhatsApp.' }}</span>
+            </div>
           </div>
-          <div class="chat-details">
-            <div class="chat-header-row">
-              <span class="chat-name">{{ user.displayName }}</span>
-              @if ((getUnreadCount(user.uid) | async); as count) {
-              @if (count > 0) {
-              <span class="unread-badge">{{ count }}</span>
-              }
-              }
-            </div>
-            <span class="chat-sub">{{ user.bio || 'Hey there! I am using Abhi WhatsApp.' }}</span>
+
+          <!-- Delete contact friend action -->
+          <div class="friend-actions-panel pe-2 flex-shrink-0">
+            <button class="btn btn-outline-danger border-0 p-1 rounded-circle"
+              (click)="$event.stopPropagation(); removeFriend(user.uid);" title="Remove Friend"
+              style="width: 26px; height: 26px; display: flex; align-items: center; justify-content: center; background: transparent;">
+              <i class="bi bi-person-dash-fill" style="font-size: 0.85rem;"></i>
+            </button>
           </div>
         </div>
         } @empty {
@@ -280,27 +371,6 @@
           } @else {
           <span class="profile-text">{{ currentUser.bio || 'Add status...' }}</span>
           <button class="edit-inline-btn" (click)="toggleEditBio()" title="Edit About">
-            <i class="bi bi-pencil-fill"></i>
-          </button>
-          }
-        </div>
-      </div>
-
-
-      <div class="profile-section">
-        <label class="section-label">Password</label>
-        <div class="profile-value-row">
-          @if (editingPassword()) {
-          <div class="edit-wrapper">
-            <input type="password" class="profile-edit-input" placeholder="Enter new password" [ngModel]="newPassword()"
-              (ngModelChange)="newPassword.set($event)" (keydown.enter)="savePassword()" maxlength="30" />
-            <button class="save-inline-btn" (click)="savePassword()" title="Save">
-              <i class="bi bi-check-lg"></i>
-            </button>
-          </div>
-          } @else {
-          <span class="profile-text">••••••••</span>
-          <button class="edit-inline-btn" (click)="editingPassword.set(true)" title="Change Password">
             <i class="bi bi-pencil-fill"></i>
           </button>
           }

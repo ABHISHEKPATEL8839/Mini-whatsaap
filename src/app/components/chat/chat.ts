@@ -1,16 +1,16 @@
-import 'emoji-picker-element';
 import {
   Component, Input, Output, EventEmitter, OnInit, OnDestroy, OnChanges, SimpleChanges,
   signal, ViewChild, ElementRef, AfterViewChecked, computed
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Subscription } from 'rxjs';
+import { PickerComponent } from '@ctrl/ngx-emoji-mart';
 import { FirebaseService, UserProfile, Message, ChatGroup, Invitation } from '../../services/firebase.service';
 
 @Component({
   selector: 'app-chat',
   standalone: true,
-  imports: [FormsModule],
+  imports: [FormsModule, PickerComponent],
   templateUrl: './chat.html',
   styleUrl: './chat.css'
 })
@@ -45,10 +45,15 @@ export class ChatComponent implements OnInit, OnDestroy, OnChanges, AfterViewChe
   users = signal<UserProfile[]>([]);
   groups = signal<ChatGroup[]>([]);
 
+  get isGroupChat(): boolean {
+    const cid = this.chatId;
+    return cid === 'group' || cid.startsWith('group_') || this.groups().some(g => g.id === cid);
+  }
+
   friendship = computed(() => {
     const cid = this.chatId;
     const me = this.currentUser?.uid;
-    if (cid === 'group' || cid.startsWith('group_') || !me || !this.chatPartner) {
+    if (this.isGroupChat || !me || !this.chatPartner) {
       return { isGroup: true, status: 'accepted', invite: null };
     }
 
@@ -72,11 +77,11 @@ export class ChatComponent implements OnInit, OnDestroy, OnChanges, AfterViewChe
     const cid = this.chatId;
     const me = this.currentUser?.uid;
     if (cid === 'group') return true;
-    if (cid.startsWith('group_')) {
-      const g = this.groups().find(x => x.id === cid);
-      if (!g) return false;
+    const g = this.groups().find(x => x.id === cid.replace("group_", ""));
+    if (g) {
       return !g.members || (me && g.members.includes(me)) ? true : false;
     }
+    if (cid.startsWith('group_')) return false;
     return true;
   });
 
@@ -257,16 +262,23 @@ export class ChatComponent implements OnInit, OnDestroy, OnChanges, AfterViewChe
   get chatTitle(): string {
     if (this.chatId === 'group') return '🌐 Global Circle';
     if (this.chatId.startsWith('group_')) {
-      const g = this.groups().find(x => x.id === this.chatId);
-      return g ? `👥 ${g.name}` : 'Group Chat';
+      const g = this.groups().find(x => x.id === this.chatId.replace('group_', ''));
+      return g ? ` ${g.name}` : 'Group Chat';
     }
     return this.chatPartner?.displayName || 'Chat';
   }
 
   get chatSubtitle(): string {
-    if (this.chatId === 'group' || this.chatId.startsWith('group_')) {
+    if (this.chatId === 'group') {
       const activeCount = this.users().filter(u => u.status === 'online').length;
       return `${activeCount} online`;
+    }
+    if (this.chatId.startsWith('group_')) {
+      const g = this.groups().find(x => x.id === this.chatId.replace("group_", ""));
+      if (!g) return '0 members';
+      const membersCount = g.members ? g.members.length : 1;
+      const onlineCount = this.users().filter(u => u.status === 'online' && g.members?.includes(u.uid)).length;
+      return `${membersCount} members, ${onlineCount} online`;
     }
     const status = this.chatPartner?.status || 'offline';
     return status === 'online' ? '🟢 Online' : '⚫ Last seen recently';
@@ -313,5 +325,19 @@ export class ChatComponent implements OnInit, OnDestroy, OnChanges, AfterViewChe
 
   async rejectInvite(id: string) {
     await this.firebaseService.rejectInvitation(id);
+  }
+
+  async deleteMessage(messageId: string) {
+    if (confirm('Are you sure you want to delete this message? This action cannot be undone.')) {
+      await this.firebaseService.deleteMessage(messageId);
+    }
+  }
+
+  addEmojiMart(event: any) {
+    const emoji = event.emoji?.native || event.native || event;
+    if (emoji) {
+      this.messageText.update(text => text + emoji);
+    }
+    this.showEmojiPicker.set(false);
   }
 }
