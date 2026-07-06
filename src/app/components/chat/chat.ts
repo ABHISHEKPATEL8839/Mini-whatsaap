@@ -41,6 +41,13 @@ export class ChatComponent implements OnInit, OnDestroy, OnChanges, AfterViewChe
   selectedFileType = signal<'image' | 'video' | 'document' | null>(null);
   selectedFileName = signal<string | null>(null);
 
+  // Options dropdown and Group edit modal states
+  showOptionsMenu = signal(false);
+  isEditingGroup = signal(false);
+  editingGroupName = signal('');
+  editingGroupMembers = signal<string[]>([]);
+  editingGroupAvatar = signal('');
+
   // Users signal to query user information dynamically
   users = signal<UserProfile[]>([]);
   groups = signal<ChatGroup[]>([]);
@@ -49,6 +56,33 @@ export class ChatComponent implements OnInit, OnDestroy, OnChanges, AfterViewChe
     const cid = this.chatId;
     return cid === 'group' || cid.startsWith('group_') || this.groups().some(g => g.id === cid);
   }
+
+  friends = computed(() => {
+    const me = this.currentUser?.uid;
+    if (!me) return [];
+    const invites = this.invitations();
+    const all = this.users();
+
+    const friendUids = new Set(
+      invites
+        .filter(i => i.status === 'accepted' && (i.senderUid === me || i.receiverUid === me))
+        .map(i => i.senderUid === me ? i.receiverUid : i.senderUid)
+    );
+
+    return all.filter(u => friendUids.has(u.uid));
+  });
+
+  currentGroup = computed(() => {
+    const cid = this.chatId;
+    return this.groups().find(g => g.id === cid || g.id === cid.replace('group_', '')) || null;
+  });
+
+  isGroupCreator = computed(() => {
+    const me = this.currentUser?.uid;
+    const g = this.currentGroup();
+    if (!me || !g || !g.createdBy) return false;
+    return g.createdBy === me;
+  });
 
   friendship = computed(() => {
     const cid = this.chatId;
@@ -93,6 +127,87 @@ export class ChatComponent implements OnInit, OnDestroy, OnChanges, AfterViewChe
 
   constructor(public firebaseService: FirebaseService) { }
 
+  toggleOptionsMenu() {
+    this.showOptionsMenu.update(v => !v);
+  }
+
+  startEditGroup() {
+    const g = this.currentGroup();
+    if (g) {
+      this.editingGroupName.set(g.name);
+      this.editingGroupMembers.set(g.members || []);
+      this.editingGroupAvatar.set(g.avatar || '');
+      this.isEditingGroup.set(true);
+    }
+    this.showOptionsMenu.set(false);
+  }
+
+  cancelEditGroup() {
+    this.isEditingGroup.set(false);
+  }
+
+  toggleEditingGroupMemberSelection(uid: string) {
+    this.editingGroupMembers.update(members =>
+      members.includes(uid) ? members.filter(id => id !== uid) : [...members, uid]
+    );
+  }
+
+  isEditingGroupMemberSelected(uid: string): boolean {
+    return this.editingGroupMembers().includes(uid);
+  }
+
+  onEditGroupAvatarSelected(event: any) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      this.editingGroupAvatar.set(reader.result as string);
+    };
+    reader.readAsDataURL(file);
+  }
+
+  async saveGroupEdit() {
+    const g = this.currentGroup();
+    const name = this.editingGroupName().trim();
+    if (g && name) {
+      const members = this.editingGroupMembers();
+      const avatar = this.editingGroupAvatar();
+      await this.firebaseService.updateGroup(g.id, name, members, avatar);
+      this.isEditingGroup.set(false);
+    }
+  }
+
+  async deleteGroup() {
+    const g = this.currentGroup();
+    if (g && confirm('Are you sure you want to delete this group? All messages in this group will be inaccessible.')) {
+      await this.firebaseService.deleteGroup(g.id);
+      this.goBack();
+    }
+    this.showOptionsMenu.set(false);
+  }
+
+  async leaveGroup() {
+    const g = this.currentGroup();
+    if (g && confirm('Are you sure you want to leave this group?')) {
+      await this.firebaseService.leaveGroup(g.id);
+      this.goBack();
+    }
+    this.showOptionsMenu.set(false);
+  }
+
+  async removeFriend() {
+    if (this.chatPartner && confirm('Are you sure you want to remove this friend? You will not be able to chat with them until you connect again.')) {
+      await this.firebaseService.deleteFriend(this.chatPartner.uid);
+      this.goBack();
+    }
+    this.showOptionsMenu.set(false);
+  }
+
+  goBack() {
+    this.backClicked.emit();
+  }
+
   ngOnInit() {
     this.subscribeToMessages();
     this.usersSubscription = this.firebaseService.users$.subscribe(list => {
@@ -111,6 +226,8 @@ export class ChatComponent implements OnInit, OnDestroy, OnChanges, AfterViewChe
       this.subscribeToMessages();
       this.shouldScrollToBottom = true;
       this.clearSelectedFile();
+      this.showOptionsMenu.set(false);
+      this.isEditingGroup.set(false);
     }
   }
 
@@ -163,6 +280,11 @@ export class ChatComponent implements OnInit, OnDestroy, OnChanges, AfterViewChe
     if (this.isSentByMe(message)) return 'You';
     const sender = this.users().find(u => u.uid === message.senderId);
     return sender ? sender.displayName : (message.senderName || 'Friend');
+  }
+
+  getSenderAvatar(message: Message): string | null {
+    const sender = this.users().find(u => u.uid === message.senderId);
+    return sender?.avatar || null;
   }
 
   formatTime(timestamp: number): string {
@@ -305,9 +427,7 @@ export class ChatComponent implements OnInit, OnDestroy, OnChanges, AfterViewChe
     return colors[index];
   }
 
-  goBack() {
-    this.backClicked.emit();
-  }
+
 
   async sendInvite() {
     if (this.chatPartner) {

@@ -71,6 +71,7 @@ export class App implements OnInit {
 
   goBackToSidebar() {
     this.mobileChatActive.set(false);
+    this.activeChatId.set('');
   }
 
   async acceptInvite(id: string) {

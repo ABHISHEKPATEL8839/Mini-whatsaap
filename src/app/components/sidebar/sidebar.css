@@ -593,11 +593,15 @@
   justify-content: center;
   align-items: center;
   margin-bottom: 8px;
+  position: relative;
+  width: 150px;
+  height: 150px;
+  margin: 0 auto;
 }
 
 .giant-avatar {
-  width: 150px;
-  height: 150px;
+  width: 100%;
+  height: 100%;
   border-radius: 50%;
   font-size: 3.8rem;
   font-weight: 700;
@@ -608,6 +612,23 @@
   text-transform: uppercase;
   box-shadow: 0 10px 30px rgba(0,0,0,0.5);
   border: 3px solid rgba(255,255,255,0.05);
+  position: relative;
+}
+
+.avatar-hover-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  background: rgba(11, 20, 26, 0.78);
+  opacity: 0;
+  transition: opacity 0.2s ease-in-out;
+}
+
+.giant-avatar-wrap:hover .avatar-hover-overlay {
+  opacity: 1;
 }
 
 .profile-section {

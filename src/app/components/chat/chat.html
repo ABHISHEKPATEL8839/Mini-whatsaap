@@ -29,16 +29,22 @@
         <i class="bi bi-chevron-left fs-4"></i>
       </button>
       @if (isGroupChat) {
-      <!-- @if (chatId.includes('group_')) { -->
-      <div class="partner-avatar group-avatar-style">
-        <i class="bi bi-people-fill"></i>
-      </div>
-      <!-- } -->
+        <div class="partner-avatar group-avatar-style overflow-hidden d-flex align-items-center justify-content-center" [style.background-color]="getUserColor(chatId)">
+          @if (currentGroup()?.avatar && currentGroup()!.avatar!.startsWith('data:image/')) {
+            <img [src]="currentGroup()!.avatar" alt="Group Icon" class="w-100 h-100 object-fit-cover" />
+          } @else {
+            <i class="bi bi-people-fill"></i>
+          }
+        </div>
       } @else {
-      <div class="partner-avatar" [style.background-color]="getUserColor(chatPartner?.uid || '')">
-        {{ getUserInitials(chatPartner?.displayName || '') }}
-        <span class="header-status-dot" [class.online]="chatPartner?.status === 'online'"></span>
-      </div>
+        <div class="partner-avatar overflow-hidden d-flex align-items-center justify-content-center" [style.background-color]="getUserColor(chatPartner?.uid || '')">
+          @if (chatPartner?.avatar && chatPartner!.avatar.startsWith('data:image/')) {
+            <img [src]="chatPartner!.avatar" alt="Profile Picture" class="w-100 h-100 object-fit-cover" />
+          } @else {
+            {{ getUserInitials(chatPartner?.displayName || '') }}
+          }
+          <span class="header-status-dot" [class.online]="chatPartner?.status === 'online'"></span>
+        </div>
       }
       <div class="partner-details">
         <h2 class="partner-name">{{ chatTitle }}</h2>
@@ -46,10 +52,38 @@
       </div>
     </div>
 
-    <div class="chat-header-actions">
+    <div class="chat-header-actions position-relative">
       <button class="header-action-btn" title="Voice Call"><i class="bi bi-telephone"></i></button>
       <button class="header-action-btn" title="Video Call"><i class="bi bi-camera-video"></i></button>
-      <button class="header-action-btn" title="More Options"><i class="bi bi-three-dots-vertical"></i></button>
+      <button class="header-action-btn" [class.active]="showOptionsMenu()" (click)="toggleOptionsMenu()" title="More Options">
+        <i class="bi bi-three-dots-vertical"></i>
+      </button>
+
+      <!-- Dropdown Menu -->
+      @if (showOptionsMenu()) {
+      <div class="header-dropdown-menu animate-fade-in shadow-lg">
+        @if (isGroupChat) {
+          <!-- Group options -->
+          @if (isGroupCreator()) {
+            <button class="dropdown-item text-warning" (click)="startEditGroup()">
+              <i class="bi bi-pencil-fill me-2"></i> Edit Group
+            </button>
+            <button class="dropdown-item text-danger" (click)="deleteGroup()">
+              <i class="bi bi-trash3-fill me-2"></i> Delete Group
+            </button>
+          } @else {
+            <button class="dropdown-item text-danger" (click)="leaveGroup()">
+              <i class="bi bi-box-arrow-right me-2"></i> Leave Group
+            </button>
+          }
+        } @else {
+          <!-- Contact options -->
+          <button class="dropdown-item text-danger" (click)="removeFriend()">
+            <i class="bi bi-person-x-fill me-2"></i> Remove Contact
+          </button>
+        }
+      </div>
+      }
     </div>
   </div>
 
@@ -129,8 +163,12 @@
     @for (msg of messages(); track msg.id) {
     <div class="message-row" [class.sent]="isSentByMe(msg)" [class.received]="!isSentByMe(msg)">
       @if (!isSentByMe(msg)) {
-      <div class="msg-avatar" [style.background-color]="getUserColor(msg.senderId)" [title]="getSenderName(msg)">
-        {{ getUserInitials(getSenderName(msg)) }}
+      <div class="msg-avatar overflow-hidden d-flex align-items-center justify-content-center" [style.background-color]="getUserColor(msg.senderId)" [title]="getSenderName(msg)">
+        @if (getSenderAvatar(msg)) {
+          <img [src]="getSenderAvatar(msg)" alt="Avatar" class="w-100 h-100 object-fit-cover" />
+        } @else {
+          {{ getUserInitials(getSenderName(msg)) }}
+        }
       </div>
       }
 
@@ -256,5 +294,59 @@
     </button>
   </div>
   }
+  }
+
+  <!-- Edit Group Modal Overlay -->
+  @if (isEditingGroup()) {
+  <div class="edit-group-overlay animate-fade-in d-flex align-items-center justify-content-center">
+    <div class="edit-group-modal card bg-dark text-white border border-secondary border-opacity-25 shadow-lg p-4" style="max-width: 400px; width: 90%;">
+      <div class="d-flex justify-content-between align-items-center mb-3">
+        <h5 class="fw-bold mb-0 text-warning"><i class="bi bi-pencil-square"></i> Modify Group Details</h5>
+        <button class="btn-close btn-close-white" (click)="cancelEditGroup()"></button>
+      </div>
+      
+      <!-- Edit Group Avatar Upload -->
+      <div class="d-flex align-items-center gap-3 mb-3">
+        <input type="file" #editGrpAvatarInput (change)="onEditGroupAvatarSelected($event)" style="display: none;" accept="image/*" />
+        <div class="grp-avatar-preview overflow-hidden d-flex align-items-center justify-content-center bg-black bg-opacity-30 rounded-circle border border-secondary" style="width: 52px; height: 52px; cursor: pointer;" (click)="editGrpAvatarInput.click()" title="Change Group Picture">
+          @if (editingGroupAvatar()) {
+            <img [src]="editingGroupAvatar()" alt="Group Icon" class="w-100 h-100 object-fit-cover" />
+          } @else {
+            <i class="bi bi-camera text-secondary fs-4"></i>
+          }
+        </div>
+        <span class="text-secondary small" style="cursor: pointer; user-select: none;" (click)="editGrpAvatarInput.click()">Change Group Icon</span>
+      </div>
+
+      <div class="mb-3">
+        <label class="text-secondary small fw-bold mb-1">Group Name</label>
+        <input type="text" placeholder="Group name..." [ngModel]="editingGroupName()"
+          (ngModelChange)="editingGroupName.set($event)" maxlength="25"
+          class="form-control bg-black text-white border-secondary" style="font-size: 0.85rem;" />
+      </div>
+
+      <div class="mb-3">
+        <label class="text-secondary small fw-bold mb-1">Manage Participants</label>
+        <div class="participants-list border border-secondary border-opacity-25 rounded p-2 overflow-y-auto"
+          style="max-height: 150px; background: rgba(0,0,0,0.2);">
+          @for (friend of friends(); track friend.uid) {
+            <div class="member-select-row d-flex align-items-center gap-2 mb-1" (click)="toggleEditingGroupMemberSelection(friend.uid)">
+              <input type="checkbox" [checked]="isEditingGroupMemberSelected(friend.uid)" (click)="$event.stopPropagation()" style="cursor: pointer;" />
+              <span class="text-white small" style="user-select: none;">
+                {{ friend.displayName }}
+              </span>
+            </div>
+          } @empty {
+            <div class="text-muted small text-center py-2">No friends available.</div>
+          }
+        </div>
+      </div>
+
+      <div class="d-flex gap-2 justify-content-end">
+        <button class="btn btn-sm btn-outline-secondary px-3" (click)="cancelEditGroup()">Cancel</button>
+        <button class="btn btn-sm btn-warning px-3 text-dark fw-bold" (click)="saveGroupEdit()" [disabled]="!editingGroupName().trim()">Update</button>
+      </div>
+    </div>
+  </div>
   }
 </div>

@@ -6,8 +6,12 @@
   <div class="profile-header">
     @if (currentUser) {
     <div class="user-avatar-wrap clickable-profile" (click)="viewMode.set('profile')" title="View Profile">
-      <div class="user-avatar" [style.background-color]="getUserColor(currentUser.uid)">
-        {{ getUserInitials(currentUser.displayName) }}
+      <div class="user-avatar overflow-hidden d-flex align-items-center justify-content-center" [style.background-color]="getUserColor(currentUser.uid)">
+        @if (currentUser.avatar && currentUser.avatar.startsWith('data:image/')) {
+          <img [src]="currentUser.avatar" alt="Profile Picture" class="w-100 h-100 object-fit-cover" />
+        } @else {
+          {{ getUserInitials(currentUser.displayName) }}
+        }
       </div>
       <span class="live-dot status-online"></span>
     </div>
@@ -37,17 +41,17 @@
         <span>GROUPS & CHANNELS</span>
         <div class="d-flex align-items-center">
           <button class="add-group-btn me-2"
-            (click)="showCreateGroup.update(v => !v); showAddFriend.set(false); showPendingRequests.set(false); cancelEditGroup();"
+            (click)="showCreateGroup.update(v => !v); showAddFriend.set(false); showPendingRequests.set(false);"
             title="Create New Group">
             <i class="bi bi-plus-lg"></i> Group
           </button>
           <button class="add-group-btn bg-success bg-opacity-25 border-success text-success me-2"
-            (click)="showAddFriend.update(v => !v); showCreateGroup.set(false); showPendingRequests.set(false); cancelEditGroup();"
+            (click)="showAddFriend.update(v => !v); showCreateGroup.set(false); showPendingRequests.set(false);"
             title="Add Friend by Email">
             <i class="bi bi-person-plus-fill"></i> Add Friend
           </button>
           <button class="add-group-btn bg-warning bg-opacity-25 border-warning text-warning position-relative"
-            (click)="showPendingRequests.update(v => !v); showCreateGroup.set(false); showAddFriend.set(false); cancelEditGroup();"
+            (click)="showPendingRequests.update(v => !v); showCreateGroup.set(false); showAddFriend.set(false);"
             title="Check Pending Requests">
             <i class="bi bi-bell-fill"></i> Requests
             @if (receivedPendingInvitations().length > 0) {
@@ -65,6 +69,19 @@
       <div class="create-group-form animate-fade-in">
         <input type="text" placeholder="Enter group name..." [ngModel]="newGroupName()"
           (ngModelChange)="newGroupName.set($event)" (keydown.enter)="createGroup()" maxlength="25" />
+
+        <!-- Group Avatar Upload -->
+        <div class="d-flex align-items-center gap-3 mt-2 mb-1">
+          <input type="file" #grpAvatarInput (change)="onNewGroupAvatarSelected($event)" style="display: none;" accept="image/*" />
+          <div class="grp-avatar-preview overflow-hidden d-flex align-items-center justify-content-center bg-black bg-opacity-30 rounded-circle border border-secondary" style="width: 44px; height: 44px; cursor: pointer;" (click)="grpAvatarInput.click()" title="Upload Group Picture">
+            @if (newGroupAvatar()) {
+              <img [src]="newGroupAvatar()" alt="Preview" class="w-100 h-100 object-fit-cover" />
+            } @else {
+              <i class="bi bi-camera text-secondary fs-5"></i>
+            }
+          </div>
+          <span class="text-secondary small" style="cursor: pointer; user-select: none;" (click)="grpAvatarInput.click()">Set Group Picture</span>
+        </div>
 
         <!-- Select participants list -->
         <label class="text-secondary small fw-bold mt-2 mb-1">Select Participants (Contacts)</label>
@@ -91,37 +108,7 @@
       </div>
       }
 
-      <!-- Edit Group Inline Form -->
-      @if (editingGroupId()) {
-      <div
-        class="create-group-form animate-fade-in p-3 bg-dark bg-opacity-50 border border-warning border-opacity-25 rounded mb-2 mx-2">
-        <label class="text-warning small fw-bold mb-1"><i class="bi bi-pencil-square"></i> Modify Group Details</label>
-        <input type="text" placeholder="Group name..." [ngModel]="editingGroupName()"
-          (ngModelChange)="editingGroupName.set($event)" maxlength="25"
-          class="form-control form-control-sm bg-dark text-white border-secondary mb-2" />
 
-        <label class="text-secondary small fw-bold mb-1">Manage Participants</label>
-        <div class="participants-list border border-secondary border-opacity-25 rounded p-2 overflow-y-auto mb-2"
-          style="max-height: 120px; background: rgba(0,0,0,0.2);">
-          @for (friend of friends(); track friend.uid) {
-          <div class="member-select-row d-flex align-items-center gap-2 mb-1"
-            (click)="toggleEditingGroupMemberSelection(friend.uid)">
-            <input type="checkbox" [checked]="isEditingGroupMemberSelected(friend.uid)"
-              (click)="$event.stopPropagation()" style="cursor: pointer;" />
-            <span class="text-white small" style="user-select: none;">
-              {{ friend.displayName }}
-            </span>
-          </div>
-          }
-        </div>
-        <div class="create-group-actions d-flex gap-2 justify-content-end">
-          <button class="btn btn-sm btn-outline-secondary py-0" style="font-size: 0.75rem;"
-            (click)="cancelEditGroup()">Cancel</button>
-          <button class="btn btn-sm btn-warning py-0 text-dark fw-bold" style="font-size: 0.75rem;"
-            (click)="saveGroupEdit()" [disabled]="!editingGroupName().trim()">Update</button>
-        </div>
-      </div>
-      }
 
       <!-- Add Friend Inline Form -->
       @if (showAddFriend()) {
@@ -224,11 +211,15 @@
         [class.active]="activeChatId === g.id">
         <div class="d-flex align-items-center flex-grow-1 min-w-0" (click)="selectChat('group_'+g.id)"
           style="cursor: pointer;">
-          <div class="chat-avatar-wrap group-avatar-style-dynamic flex-shrink-0 m-2"
+          <div class="chat-avatar-wrap group-avatar-style-dynamic overflow-hidden flex-shrink-0 m-2 d-flex align-items-center justify-content-center"
             [style.background-color]="getUserColor(g.id)">
-            <div class="chat-avatar-initials">
-              {{ getUserInitials(g.name) }}
-            </div>
+            @if (g.avatar && g.avatar.startsWith('data:image/')) {
+              <img [src]="g.avatar" alt="Group Icon" class="w-100 h-100 object-fit-cover" />
+            } @else {
+              <div class="chat-avatar-initials">
+                {{ getUserInitials(g.name) }}
+              </div>
+            }
           </div>
           <div class="chat-details text-truncate min-w-0">
             <div class="chat-header-row">
@@ -239,21 +230,6 @@
           </div>
         </div>
 
-        <!-- Group CRUD Actions for Creators -->
-        @if (g.createdBy === currentUser?.uid) {
-        <div class="group-actions-panel d-flex gap-1 pe-2 flex-shrink-0">
-          <button class="btn btn-outline-warning border-0 p-1 rounded-circle"
-            (click)="$event.stopPropagation(); startEditGroup(g);" title="Edit Group"
-            style="width: 26px; height: 26px; display: flex; align-items: center; justify-content: center; background: transparent;">
-            <i class="bi bi-pencil-fill" style="font-size: 0.78rem;"></i>
-          </button>
-          <button class="btn btn-outline-danger border-0 p-1 rounded-circle"
-            (click)="$event.stopPropagation(); deleteGroup(g.id);" title="Delete Group"
-            style="width: 26px; height: 26px; display: flex; align-items: center; justify-content: center; background: transparent;">
-            <i class="bi bi-trash3-fill" style="font-size: 0.78rem;"></i>
-          </button>
-        </div>
-        }
       </div>
       }
 
@@ -266,8 +242,12 @@
           <div class="d-flex align-items-center flex-grow-1 min-w-0 m-2" (click)="selectChat(user.uid)"
             style="cursor: pointer;">
             <div class="chat-avatar-wrap">
-              <div class="chat-avatar" [style.background-color]="getUserColor(user.uid)">
-                {{ getUserInitials(user.displayName) }}
+              <div class="chat-avatar overflow-hidden d-flex align-items-center justify-content-center" [style.background-color]="getUserColor(user.uid)">
+                @if (user.avatar && user.avatar.startsWith('data:image/')) {
+                  <img [src]="user.avatar" alt="Profile Picture" class="w-100 h-100 object-fit-cover" />
+                } @else {
+                  {{ getUserInitials(user.displayName) }}
+                }
               </div>
               <span class="live-dot" [class.status-online]="user.status === 'online'"
                 [class.status-offline]="user.status === 'offline'"></span>
@@ -283,15 +263,6 @@
               </div>
               <span class="chat-sub">{{ user.bio || 'Hey there! I am using Abhi WhatsApp.' }}</span>
             </div>
-          </div>
-
-          <!-- Delete contact friend action -->
-          <div class="friend-actions-panel pe-2 flex-shrink-0">
-            <button class="btn btn-outline-danger border-0 p-1 rounded-circle"
-              (click)="$event.stopPropagation(); removeFriend(user.uid);" title="Remove Friend"
-              style="width: 26px; height: 26px; display: flex; align-items: center; justify-content: center; background: transparent;">
-              <i class="bi bi-person-dash-fill" style="font-size: 0.85rem;"></i>
-            </button>
           </div>
         </div>
         } @empty {
@@ -329,9 +300,18 @@
     <!-- Profile Content Scrollable -->
     <div class="profile-panel-content">
       <!-- Giant Circle Avatar -->
-      <div class="giant-avatar-wrap">
-        <div class="giant-avatar" [style.background-color]="getUserColor(currentUser.uid)">
-          {{ getUserInitials(currentUser.displayName) }}
+      <input type="file" #profilePicInput (change)="onProfilePicSelected($event)" style="display: none;" accept="image/*" />
+      <div class="giant-avatar-wrap position-relative" style="cursor: pointer; margin-bottom: 24px;" (click)="profilePicInput.click()">
+        <div class="giant-avatar overflow-hidden d-flex align-items-center justify-content-center" [style.background-color]="getUserColor(currentUser.uid)">
+          @if (currentUser.avatar && currentUser.avatar.startsWith('data:image/')) {
+            <img [src]="currentUser.avatar" alt="Profile Picture" class="w-100 h-100 object-fit-cover" />
+          } @else {
+            {{ getUserInitials(currentUser.displayName) }}
+          }
+          <div class="avatar-hover-overlay d-flex flex-column align-items-center justify-content-center">
+            <i class="bi bi-camera-fill text-white fs-3 mb-1"></i>
+            <span class="text-white text-center fw-semibold" style="font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.5px; line-height: 1.2;">Change Profile Photo</span>
+          </div>
         </div>
       </div>
 

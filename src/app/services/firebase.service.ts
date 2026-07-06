@@ -29,7 +29,8 @@ import {
   writeBatch,
   Firestore,
   serverTimestamp,
-  deleteDoc
+  deleteDoc,
+  arrayRemove
 } from 'firebase/firestore';
 
 /* ================= MODELS ================= */
@@ -52,6 +53,7 @@ export interface ChatGroup {
   createdAt: number;
   createdBy: string;
   members?: string[];
+  avatar?: string;
 }
 
 export interface Invitation {
@@ -191,7 +193,7 @@ export class FirebaseService {
           if (current) {
             try {
               await this.setUserStatus(current.uid, 'offline');
-            } catch (statusErr) {}
+            } catch (statusErr) { }
           }
           this._currentUser$.next(null);
           if (firstAuthCheck) {
@@ -204,11 +206,15 @@ export class FirebaseService {
         // Query firestore for existing user profile
         const userRef = doc(this.db!, 'users', user.uid);
         let bio = 'Hey there! I am using Abhi WhatsApp.';
+        let avatar = '👤';
+        let photoURL = '👤';
         try {
           const userSnap = await getDocs(query(collection(this.db!, 'users'), where('uid', '==', user.uid)));
           if (!userSnap.empty) {
             const data = userSnap.docs[0].data() as UserProfile;
             bio = data.bio || bio;
+            avatar = data.avatar || avatar;
+            photoURL = data.photoURL || data.avatar || photoURL;
           }
         } catch (snapErr) {
           console.warn('Firestore read blocked by rules, using default bio');
@@ -218,11 +224,11 @@ export class FirebaseService {
           uid: user.uid,
           email: user.email || '',
           displayName: user.displayName || 'User',
-          avatar: '👤',
+          avatar: avatar,
           status: 'online',
           bio: bio,
           lastSeen: Date.now(),
-          photoURL: user.photoURL || '👤'
+          photoURL: photoURL
         };
 
         this._currentUser$.next(profile);
@@ -350,8 +356,8 @@ export class FirebaseService {
 
     const savedGroups = localStorage.getItem(this.KEY_GROUPS);
     let parsedGroups: ChatGroup[] = savedGroups ? JSON.parse(savedGroups) : [];
-    parsedGroups = parsedGroups.filter(g => 
-      !g.name.toLowerCase().includes('company') && 
+    parsedGroups = parsedGroups.filter(g =>
+      !g.name.toLowerCase().includes('company') &&
       !g.name.toLowerCase().includes('compant')
     );
     this.mockGroups = parsedGroups;
@@ -404,7 +410,7 @@ export class FirebaseService {
       try {
         const cred = await createUserWithEmailAndPassword(this.auth, emailClean, password);
         await updateProfile(cred.user, { displayName: name });
-        
+
         const user: UserProfile = {
           uid: cred.user.uid,
           email: emailClean,
@@ -457,7 +463,7 @@ export class FirebaseService {
     if (!this.isMockMode && this.auth) {
       try {
         const cred = await signInWithEmailAndPassword(this.auth, emailClean, password);
-        
+
         // Fetch user profile from Firestore
         const userSnap = await getDocs(query(collection(this.db!, 'users'), where('uid', '==', cred.user.uid)));
         if (!userSnap.empty) {
@@ -505,7 +511,7 @@ export class FirebaseService {
 
   /* ================= PROFILE SETTINGS ================= */
 
-  async updateProfileData(displayName: string, bio: string, newPass?: string) {
+  async updateProfileData(displayName: string, bio: string, avatar?: string, newPass?: string) {
     const me = this._currentUser$.value;
     if (!me) return;
 
@@ -523,18 +529,27 @@ export class FirebaseService {
             await updatePassword(user, newPass.trim());
           }
         }
-        
+
         const updatedProfile = {
           ...me,
           displayName: nameClean || me.displayName,
-          bio: bioClean
+          bio: bioClean,
+          avatar: avatar !== undefined ? avatar : me.avatar,
+          // photoURL: avatar !== undefined ? avatar : me.avatar
         };
-        
-        await updateDoc(doc(this.db, 'users', me.uid), {
+
+        const dbUpdate: any = {
           displayName: nameClean || me.displayName,
           bio: bioClean
-        });
+        };
+        if (avatar !== undefined) {
+          dbUpdate.avatar = avatar;
+          dbUpdate.photoURL = avatar;
+        }
+
+        await updateDoc(doc(this.db, 'users', me.uid), dbUpdate);
         this._currentUser$.next(updatedProfile);
+        localStorage.setItem(this.KEY_SESSION, JSON.stringify(updatedProfile));
         return;
       } catch (err) {
         console.warn('Firebase profile update failed, falling back to mock mode:', err);
@@ -548,6 +563,9 @@ export class FirebaseService {
     if (u) {
       u.displayName = nameClean || u.displayName;
       u.bio = bioClean;
+      if (avatar !== undefined) {
+        u.avatar = avatar;
+      }
       if (newPass && newPass.trim()) {
         u.password = newPass.trim();
       }
@@ -657,12 +675,13 @@ export class FirebaseService {
 
   /* ================= FILTER CHAT ================= */
 
-  async createGroup(name: string, members?: string[]) {
+  async createGroup(name: string, members?: string[], avatar?: string) {
     const me = this._currentUser$.value;
     if (!me || !name.trim()) return;
 
     const groupName = name.trim();
     const groupMembers = members || [me.uid];
+    const groupAvatar = avatar || '';
 
     if (!this.isMockMode && this.db) {
       try {
@@ -672,7 +691,8 @@ export class FirebaseService {
           name: groupName,
           createdAt: Date.now(),
           createdBy: me.uid,
-          members: groupMembers
+          members: groupMembers,
+          avatar: groupAvatar
         });
       } catch (err) {
         console.warn('Firebase createGroup failed, falling back to mock:', err);
@@ -685,7 +705,8 @@ export class FirebaseService {
       name: groupName,
       createdAt: Date.now(),
       createdBy: me.uid,
-      members: groupMembers
+      members: groupMembers,
+      avatar: groupAvatar
     };
     this.mockGroups.push(newGroup);
     localStorage.setItem(this.KEY_GROUPS, JSON.stringify(this.mockGroups));
@@ -770,7 +791,7 @@ export class FirebaseService {
     }
 
     // Check if invitation already exists
-    const existing = this._invitations$.value.find(i => 
+    const existing = this._invitations$.value.find(i =>
       (i.senderUid === me.uid && i.receiverUid === targetUser!.uid) ||
       (i.senderUid === targetUser!.uid && i.receiverUid === me.uid)
     );
@@ -877,7 +898,7 @@ export class FirebaseService {
     }
   }
 
-  async updateGroup(groupId: string, name: string, members: string[]) {
+  async updateGroup(groupId: string, name: string, members: string[], avatar?: string) {
     const groupName = name.trim();
     if (!groupName) return;
     if (this.isMockMode) {
@@ -885,14 +906,21 @@ export class FirebaseService {
       if (g) {
         g.name = groupName;
         g.members = members;
+        if (avatar !== undefined) {
+          g.avatar = avatar;
+        }
         this.saveMock();
       }
     } else if (this.db) {
       try {
-        await updateDoc(doc(this.db, 'groups', groupId), {
+        const updateData: any = {
           name: groupName,
           members: members
-        });
+        };
+        if (avatar !== undefined) {
+          updateData.avatar = avatar;
+        }
+        await updateDoc(doc(this.db, 'groups', groupId), updateData);
       } catch (err) {
         console.error('Failed to update group', err);
       }
@@ -912,11 +940,40 @@ export class FirebaseService {
     }
   }
 
+  async leaveGroup(groupId: string) {
+    const me = this._currentUser$.value?.uid;
+    if (!me) return;
+
+    if (this.isMockMode) {
+      this.mockGroups = this.mockGroups.map(g => {
+        if (g.id === groupId) {
+          return {
+            ...g,
+            members: g.members ? g.members.filter(m => m !== me) : []
+          };
+        }
+        return g;
+      });
+      // Filter out group if the user is no longer a member
+      this.mockGroups = this.mockGroups.filter(g => g.members?.includes(me));
+      this.saveMock();
+    } else if (this.db) {
+      try {
+        const groupRef = doc(this.db, 'groups', groupId);
+        await updateDoc(groupRef, {
+          members: arrayRemove(me)
+        });
+      } catch (err) {
+        console.error('Failed to leave group', err);
+      }
+    }
+  }
+
   async deleteFriend(friendUid: string) {
     const me = this._currentUser$.value;
     if (!me) return;
     if (this.isMockMode) {
-      this.mockInvitations = this.mockInvitations.filter(i => 
+      this.mockInvitations = this.mockInvitations.filter(i =>
         !((i.senderUid === me.uid && i.receiverUid === friendUid && i.status === 'accepted') ||
           (i.senderUid === friendUid && i.receiverUid === me.uid && i.status === 'accepted'))
       );
@@ -933,7 +990,7 @@ export class FirebaseService {
         snap.forEach((docSnap) => {
           const data = docSnap.data() as Invitation;
           if ((data.senderUid === me.uid && data.receiverUid === friendUid) ||
-              (data.senderUid === friendUid && data.receiverUid === me.uid)) {
+            (data.senderUid === friendUid && data.receiverUid === me.uid)) {
             batch.delete(docRef(this.db!, 'invitations', docSnap.id));
             count++;
           }

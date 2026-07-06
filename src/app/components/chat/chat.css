@@ -614,3 +614,85 @@
   right: 102%;
   margin-right: 4px;
 }
+
+/* Header Dropdown Menu */
+.header-dropdown-menu {
+  position: absolute;
+  top: 110%;
+  right: 0;
+  background: rgba(30, 41, 59, 0.95);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  padding: 6px;
+  z-index: 1000;
+  min-width: 160px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.dropdown-item {
+  background: transparent;
+  border: none;
+  width: 100%;
+  text-align: left;
+  padding: 8px 12px;
+  font-size: 0.85rem;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+  display: flex;
+  align-items: center;
+}
+
+.dropdown-item:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+/* Edit Group Modal Overlay */
+.edit-group-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(10, 14, 22, 0.7);
+  backdrop-filter: blur(8px);
+  z-index: 2000;
+}
+
+.edit-group-modal {
+  background: rgba(30, 41, 59, 0.95) !important;
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  border-radius: 12px;
+}
+
+.edit-group-modal input {
+  background: rgba(0, 0, 0, 0.3) !important;
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  color: #fff !important;
+}
+
+.edit-group-modal input:focus {
+  border-color: var(--accent-emerald) !important;
+  box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.2) !important;
+}
+
+.member-select-row {
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+  padding: 6px 8px;
+  border-radius: 6px;
+}
+
+.member-select-row:hover {
+  background-color: rgba(255, 255, 255, 0.05);
+}
+
+.member-select-row input[type="checkbox"] {
+  width: 16px !important;
+  height: 16px !important;
+  margin: 0 !important;
+  cursor: pointer;
+}

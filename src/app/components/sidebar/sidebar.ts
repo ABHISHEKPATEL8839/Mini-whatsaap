@@ -1,4 +1,4 @@
-import { Component, Input, Output, EventEmitter, OnInit, OnDestroy, signal, computed } from '@angular/core';
+import { Component, Input, Output, EventEmitter, OnInit, OnDestroy, signal, computed, effect } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { AsyncPipe, UpperCasePipe } from '@angular/common';
 import { Subscription, Observable } from 'rxjs';
@@ -24,13 +24,8 @@ export class SidebarComponent implements OnInit, OnDestroy {
   editingName = signal(false);
   showCreateGroup = signal(false);
   newGroupName = signal('');
+  newGroupAvatar = signal('');
   showPendingRequests = signal(false);
-
-  // Group editing state
-  editingGroupId = signal<string | null>(null);
-  editingGroupName = signal<string>('');
-  editingGroupMembers = signal<string[]>([]);
-
   // Group selection state
   selectedGroupMembers = signal<string[]>([]);
 
@@ -90,7 +85,13 @@ export class SidebarComponent implements OnInit, OnDestroy {
 
   private subs: Subscription[] = [];
 
-  constructor(public firebaseService: FirebaseService) { }
+  constructor(public firebaseService: FirebaseService) {
+
+    effect(() => {
+
+      console.log(this.currentUser, "chrkckckkk")
+    })
+  }
 
   ngOnInit() {
     this.subs.push(
@@ -193,58 +194,7 @@ export class SidebarComponent implements OnInit, OnDestroy {
     this.editingName.set(false);
   }
 
-  startEditGroup(group: ChatGroup) {
-    this.editingGroupId.set(group.id);
-    this.editingGroupName.set(group.name);
-    this.editingGroupMembers.set(group.members || []);
-    this.showCreateGroup.set(false);
-    this.showAddFriend.set(false);
-    this.showPendingRequests.set(false);
-  }
 
-  cancelEditGroup() {
-    this.editingGroupId.set(null);
-    this.editingGroupName.set('');
-    this.editingGroupMembers.set([]);
-  }
-
-  isEditingGroupMemberSelected(uid: string): boolean {
-    return this.editingGroupMembers().includes(uid);
-  }
-
-  toggleEditingGroupMemberSelection(uid: string) {
-    this.editingGroupMembers.update(members =>
-      members.includes(uid) ? members.filter(id => id !== uid) : [...members, uid]
-    );
-  }
-
-  async saveGroupEdit() {
-    const groupId = this.editingGroupId();
-    const name = this.editingGroupName().trim();
-    if (groupId && name) {
-      const members = this.editingGroupMembers();
-      await this.firebaseService.updateGroup(groupId, name, members);
-      this.cancelEditGroup();
-    }
-  }
-
-  async deleteGroup(groupId: string) {
-    if (confirm('Are you sure you want to delete this group? All messages in this group will be inaccessible.')) {
-      await this.firebaseService.deleteGroup(groupId);
-      if (this.activeChatId === groupId) {
-        this.chatSelected.emit('');
-      }
-    }
-  }
-
-  async removeFriend(friendUid: string) {
-    if (confirm('Are you sure you want to remove this friend? You will not be able to chat with them until you connect again.')) {
-      await this.firebaseService.deleteFriend(friendUid);
-      if (this.activeChatId === friendUid) {
-        this.chatSelected.emit('');
-      }
-    }
-  }
 
   isMemberSelected(uid: string): boolean {
     return this.selectedGroupMembers().includes(uid);
@@ -260,11 +210,43 @@ export class SidebarComponent implements OnInit, OnDestroy {
     const name = this.newGroupName().trim();
     if (name) {
       const members = [...this.selectedGroupMembers(), this.currentUser?.uid].filter(Boolean) as string[];
-      await this.firebaseService.createGroup(name, members);
+      const avatar = this.newGroupAvatar();
+      await this.firebaseService.createGroup(name, members, avatar);
       this.newGroupName.set('');
+      this.newGroupAvatar.set('');
       this.selectedGroupMembers.set([]);
       this.showCreateGroup.set(false);
     }
+  }
+
+  onProfilePicSelected(event: any) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = async () => {
+      const base64 = reader.result as string;
+      console.log(base64, "base64")
+      if (this.currentUser) {
+        await this.firebaseService.updateProfileData(
+          this.currentUser.displayName,
+          this.currentUser.bio || '',
+          base64
+        );
+      }
+    };
+    reader.readAsDataURL(file);
+  }
+
+  onNewGroupAvatarSelected(event: any) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      this.newGroupAvatar.set(reader.result as string);
+    };
+    reader.readAsDataURL(file);
   }
 
   getUnreadCount(uid: string): Observable<number> {
