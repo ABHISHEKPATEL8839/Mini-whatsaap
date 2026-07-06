@@ -1,0 +1,42 @@
+@if (loadingAuth()) {
+  <!-- Splash Screen shown during authentication loading state -->
+  <div class="splash-screen">
+    <div class="splash-content">
+      <div class="splash-logo">
+        <i class="bi bi-chat-text-fill"></i>
+      </div>
+      <div class="splash-progress"></div>
+      <h1 class="splash-title">Abhi WhatsApp</h1>
+      <p class="splash-sub"><i class="bi bi-lock-fill"></i> End-to-end encrypted</p>
+    </div>
+  </div>
+} @else {
+  <!-- Auth Screen (shown when not logged in) -->
+  @if (!isLoggedIn()) {
+    <app-auth (loginSuccess)="onLoginSuccess()"></app-auth>
+  }
+
+  <!-- Main App Layout (shown when logged in) -->
+  @if (isLoggedIn()) {
+    <div class="app-layout animate-fade-in">
+      <!-- Left Sidebar -->
+      <aside class="sidebar-panel">
+        <app-sidebar
+          [currentUser]="currentUser()"
+          [activeChatId]="activeChatId()"
+          (chatSelected)="onChatSelected($event)"
+          (logoutRequested)="onLogoutRequested()"
+        ></app-sidebar>
+      </aside>
+
+      <!-- Right Chat Panel -->
+      <main class="chat-panel">
+        <app-chat
+          [chatId]="activeChatId()"
+          [currentUser]="currentUser()"
+          [chatPartner]="activeChatPartner()"
+        ></app-chat>
+      </main>
+    </div>
+  }
+}

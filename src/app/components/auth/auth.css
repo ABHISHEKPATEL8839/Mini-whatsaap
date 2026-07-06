@@ -1,0 +1,279 @@
+/* Full screen centered layout */
+.auth-page {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 100vw;
+  height: 100vh;
+  background: #0b141a; /* WhatsApp dark mode background */
+  font-family: var(--font-main), -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  overflow: hidden;
+  position: relative;
+  background-image: 
+    radial-gradient(at 10% 20%, rgba(0, 168, 132, 0.08) 0px, transparent 50%),
+    radial-gradient(at 90% 80%, rgba(59, 130, 246, 0.05) 0px, transparent 50%);
+}
+
+/* Glassmorphic Centered Login Card */
+.auth-card {
+  width: 100%;
+  max-width: 440px;
+  background: #111b21; /* WhatsApp dark theme card */
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 24px;
+  padding: 44px 40px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6);
+  animation: scaleIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  z-index: 10;
+}
+
+@keyframes scaleIn {
+  from { opacity: 0; transform: scale(0.95) translateY(20px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+/* Brand styling */
+.brand {
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 36px;
+}
+
+.brand .logo {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 76px;
+  height: 76px;
+  border-radius: 50%;
+  background: rgba(0, 168, 132, 0.1);
+  border: 1.5px solid rgba(0, 168, 132, 0.2);
+  box-shadow: 0 8px 24px rgba(0, 168, 132, 0.15);
+}
+
+.brand-logo-icon {
+  font-size: 2.2rem;
+  color: #00a884; /* WhatsApp brand green */
+}
+
+.brand h1 {
+  font-family: var(--font-display), sans-serif;
+  font-size: 1.8rem;
+  font-weight: 700;
+  color: #e9edef;
+  margin: 0;
+  letter-spacing: -0.5px;
+}
+
+.brand .sub {
+  font-size: 0.88rem;
+  color: #8696a0;
+  margin: 0;
+}
+
+/* Form structure */
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.field label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #8696a0;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+
+/* Sleek Input Boxes */
+.input-box {
+  display: flex;
+  align-items: center;
+  background: #202c33;
+  border: 1.5px solid transparent;
+  border-radius: 12px;
+  padding: 0 16px;
+  height: 52px;
+  transition: all 0.25s ease;
+  position: relative;
+}
+
+.input-box:focus-within {
+  border-color: #00a884;
+  box-shadow: 0 0 12px rgba(0, 168, 132, 0.25);
+  background: #2a3942;
+}
+
+.input-icon {
+  font-size: 1.25rem;
+  margin-right: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 24px;
+  color: #8696a0;
+}
+
+.input-box:focus-within .input-icon {
+  color: #00a884;
+}
+
+.input-box input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  color: #fff;
+  font-size: 0.98rem;
+  outline: none;
+  font-family: inherit;
+  padding-right: 36px; /* Space for the eye icon */
+}
+
+.input-box input::placeholder {
+  color: #667781;
+}
+
+/* Eye Visibility Toggle Icon */
+.eye-btn {
+  background: transparent;
+  border: none;
+  color: #8696a0;
+  cursor: pointer;
+  padding: 4px;
+  font-size: 1.2rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: absolute;
+  right: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  transition: color 0.2s;
+}
+
+.eye-btn:hover {
+  color: #e9edef;
+}
+
+/* Error banner */
+.error {
+  color: #f87171;
+  background: rgba(239, 68, 68, 0.08);
+  border: 1px solid rgba(239, 68, 68, 0.2);
+  border-radius: 10px;
+  padding: 12px 16px;
+  font-size: 0.85rem;
+  line-height: 1.4;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.error i {
+  font-size: 1.1rem;
+  flex-shrink: 0;
+}
+
+/* Submit Continue Button */
+.submit-btn {
+  height: 52px;
+  border: none;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #00a884, #008c6e);
+  color: #fff;
+  font-size: 1rem;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 4px 18px rgba(0, 168, 132, 0.25);
+  margin-top: 8px;
+}
+
+.submit-btn:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(0, 168, 132, 0.4);
+}
+
+.submit-btn:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.submit-btn:disabled {
+  background: #2a3942;
+  color: #667781;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+/* Spinner anim inside submit button */
+.spinner {
+  width: 18px;
+  height: 18px;
+  border: 2px solid rgba(255, 255, 255, 0.25);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: spinBtn 0.75s linear infinite;
+}
+
+@keyframes spinBtn {
+  to { transform: rotate(360deg); }
+}
+
+/* Footer note */
+.footer {
+  margin-top: 32px;
+  font-size: 0.8rem;
+  color: #667781;
+  text-align: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+.footer i {
+  font-size: 0.95rem;
+}
+
+/* Mode toggle link */
+.mode-toggle-link {
+  margin-top: 22px;
+  font-size: 0.88rem;
+  color: #8696a0;
+  text-align: center;
+}
+
+.toggle-action {
+  color: #00a884;
+  font-weight: 600;
+  cursor: pointer;
+  margin-left: 4px;
+}
+
+.toggle-action:hover {
+  text-decoration: underline;
+  color: #00c298;
+}
+
+/* Small devices / Mobile screen responsive layout */
+@media (max-width: 480px) {
+  .auth-card {
+    padding: 36px 24px;
+    margin: 16px;
+    border-radius: 20px;
+  }
+}

@@ -1,0 +1,217 @@
+<div class="sidebar">
+
+  <!-- ─── CHATS VIEW ─── -->
+  @if (viewMode() === 'chats') {
+  <!-- Profile Header Section -->
+  <div class="profile-header">
+    @if (currentUser) {
+    <div class="user-avatar-wrap clickable-profile" (click)="viewMode.set('profile')" title="View Profile">
+      <div class="user-avatar" [style.background-color]="getUserColor(currentUser.uid)">
+        {{ getUserInitials(currentUser.displayName) }}
+      </div>
+      <span class="live-dot status-online"></span>
+    </div>
+    <div class="user-info" (click)="viewMode.set('profile')" style="cursor: pointer;">
+      <h3 class="user-name">{{ currentUser.displayName }}</h3>
+      <span class="user-bio-preview">{{ currentUser.bio || 'Add about status...' }}</span>
+    </div>
+    }
+  </div>
+
+  <!-- Search Box Section -->
+  <div class="search-box">
+    <div class="search-input-wrapper">
+      <span class="search-icon"><i class="bi bi-search"></i></span>
+      <input type="text" placeholder="Search friends or groups..." [ngModel]="searchQuery()"
+        (ngModelChange)="searchQuery.set($event)" />
+      @if (searchQuery()) {
+      <button class="clear-search-btn" (click)="searchQuery.set('')"><i class="bi bi-x-lg"></i></button>
+      }
+    </div>
+  </div>
+
+  <!-- Chats List Section -->
+  <div class="chats-list">
+    <div class="list-section-title">
+      <span>GROUPS & CHANNELS</span>
+      <button class="add-group-btn" (click)="showCreateGroup.update(v => !v)" title="Create New Group">
+        <i class="bi bi-plus-lg"></i> Group
+      </button>
+    </div>
+
+    <!-- Create Group Inline Form -->
+    @if (showCreateGroup()) {
+    <div class="create-group-form animate-fade-in">
+      <input type="text" placeholder="Enter group name..." [ngModel]="newGroupName()"
+        (ngModelChange)="newGroupName.set($event)" (keydown.enter)="createGroup()" maxlength="25" />
+      <div class="create-group-actions">
+        <button class="cancel-grp-btn" (click)="showCreateGroup.set(false)">Cancel</button>
+        <button class="confirm-grp-btn" (click)="createGroup()" [disabled]="!newGroupName().trim()">Create</button>
+      </div>
+    </div>
+    }
+
+    <!-- Pinned Global Chat -->
+    <div class="chat-item pinned" [class.active]="activeChatId === 'group'" (click)="selectChat('group')">
+      <div class="chat-avatar-wrap group-avatar">
+        <div class="chat-avatar">
+          <i class="bi bi-people-fill"></i>
+        </div>
+      </div>
+      <div class="chat-details">
+        <div class="chat-header-row">
+          <span class="chat-name">Global Circle</span>
+          <span class="chat-badge">GLOBAL</span>
+        </div>
+        <span class="chat-sub">Everyone in the friend circle</span>
+      </div>
+    </div>
+
+    @for (g of filteredGroups(); track g.id) {
+    <div class="chat-item" [class.active]="activeChatId === g.id" (click)="selectChat(g.id)">
+      <div class="chat-avatar-wrap group-avatar-style-dynamic" [style.background-color]="getUserColor(g.id)">
+        <div class="chat-avatar-initials">
+          {{ getUserInitials(g.name) }}
+        </div>
+      </div>
+      <div class="chat-details">
+        <div class="chat-header-row">
+          <span class="chat-name">{{ g.name }}</span>
+          <span class="chat-badge group">GROUP</span>
+        </div>
+        <span class="chat-sub">Custom group channel</span>
+      </div>
+    </div>
+    }
+
+    <div class="list-section-title">FRIENDS ({{ filteredUsers().length }})</div>
+    <div class="friends-scroll-area">
+      @for (user of filteredUsers(); track user.uid) {
+      <div class="chat-item" [class.active]="activeChatId === user.uid" (click)="selectChat(user.uid)">
+        <div class="chat-avatar-wrap">
+          <div class="chat-avatar" [style.background-color]="getUserColor(user.uid)">
+            {{ getUserInitials(user.displayName) }}
+          </div>
+          <span class="live-dot" [class.status-online]="user.status === 'online'"
+            [class.status-offline]="user.status === 'offline'"></span>
+        </div>
+        <div class="chat-details">
+          <div class="chat-header-row">
+            <span class="chat-name">{{ user.displayName }}</span>
+            @if ((getUnreadCount(user.uid) | async); as count) {
+            @if (count > 0) {
+            <span class="unread-badge">{{ count }}</span>
+            }
+            }
+          </div>
+          <span class="chat-sub">{{ user.bio || 'Hey there! I am using Abhi WhatsApp.' }}</span>
+        </div>
+      </div>
+      } @empty {
+      <div class="empty-list-state">
+        <span>No friends found</span>
+      </div>
+      }
+    </div>
+  </div>
+
+  <!-- Sidebar Footer -->
+  <div class="sidebar-footer">
+    <div class="connection-pill" [class.mock]="firebaseService.isMockMode">
+      <span class="indicator-dot"></span>
+      <span>{{ firebaseService.isMockMode ? 'Mock' : 'Live' }}</span>
+    </div>
+    <button class="logout-btn" (click)="logout()" title="Log Out">
+      <i class="bi bi-box-arrow-right"></i> Exit
+    </button>
+  </div>
+  }
+
+  <!-- ─── PROFILE VIEW ─── -->
+  @if (viewMode() === 'profile' && currentUser) {
+  <div class="profile-panel">
+    <!-- Profile Header -->
+    <div class="profile-panel-header">
+      <button class="back-btn" (click)="viewMode.set('chats')" title="Back to Chats">
+        <i class="bi bi-arrow-left"></i>
+      </button>
+      <h2>Profile</h2>
+    </div>
+
+    <!-- Profile Content Scrollable -->
+    <div class="profile-panel-content">
+      <!-- Giant Circle Avatar -->
+      <div class="giant-avatar-wrap">
+        <div class="giant-avatar" [style.background-color]="getUserColor(currentUser.uid)">
+          {{ getUserInitials(currentUser.displayName) }}
+        </div>
+      </div>
+
+      <!-- Section: Your Name -->
+      <div class="profile-section">
+        <label class="section-label">Your Name</label>
+        <div class="profile-value-row">
+          @if (editingName()) {
+          <div class="edit-wrapper">
+            <input type="text" class="profile-edit-input" [ngModel]="newName()" (ngModelChange)="newName.set($event)"
+              (keydown.enter)="saveName()" maxlength="25" />
+            <button class="save-inline-btn" (click)="saveName()" title="Save">
+              <i class="bi bi-check-lg"></i>
+            </button>
+          </div>
+          } @else {
+          <span class="profile-text">{{ currentUser.displayName }}</span>
+          <button class="edit-inline-btn" (click)="toggleEditName()" title="Edit Name">
+            <i class="bi bi-pencil-fill"></i>
+          </button>
+          }
+        </div>
+        <span class="section-tip">This is not a username. This name will be visible to your friend circle.</span>
+      </div>
+
+      <!-- Section: About / Bio -->
+      <div class="profile-section">
+        <label class="section-label">About</label>
+        <div class="profile-value-row">
+          @if (editingBio()) {
+          <div class="edit-wrapper">
+            <input type="text" class="profile-edit-input" [ngModel]="newBio()" (ngModelChange)="newBio.set($event)"
+              (keydown.enter)="saveBio()" maxlength="60" />
+            <button class="save-inline-btn" (click)="saveBio()" title="Save">
+              <i class="bi bi-check-lg"></i>
+            </button>
+          </div>
+          } @else {
+          <span class="profile-text">{{ currentUser.bio || 'Add status...' }}</span>
+          <button class="edit-inline-btn" (click)="toggleEditBio()" title="Edit About">
+            <i class="bi bi-pencil-fill"></i>
+          </button>
+          }
+        </div>
+      </div>
+
+
+      <div class="profile-section">
+        <label class="section-label">Password</label>
+        <div class="profile-value-row">
+          @if (editingPassword()) {
+          <div class="edit-wrapper">
+            <input type="password" class="profile-edit-input" placeholder="Enter new password" [ngModel]="newPassword()"
+              (ngModelChange)="newPassword.set($event)" (keydown.enter)="savePassword()" maxlength="30" />
+            <button class="save-inline-btn" (click)="savePassword()" title="Save">
+              <i class="bi bi-check-lg"></i>
+            </button>
+          </div>
+          } @else {
+          <span class="profile-text">••••••••</span>
+          <button class="edit-inline-btn" (click)="editingPassword.set(true)" title="Change Password">
+            <i class="bi bi-pencil-fill"></i>
+          </button>
+          }
+        </div>
+      </div>
+    </div>
+  </div>
+  }
+
+</div>

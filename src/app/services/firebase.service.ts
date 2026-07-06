@@ -1,0 +1,689 @@
+import { Injectable } from '@angular/core';
+import { BehaviorSubject, Observable, map, of } from 'rxjs';
+import { environment } from '../../environments/environment';
+
+import { initializeApp, getApps, FirebaseApp } from 'firebase/app';
+import {
+  getAuth,
+  createUserWithEmailAndPassword,
+  signInWithEmailAndPassword,
+  updateProfile,
+  updatePassword,
+  onAuthStateChanged,
+  signOut,
+  Auth
+} from 'firebase/auth';
+
+import {
+  getFirestore,
+  collection,
+  addDoc,
+  query,
+  orderBy,
+  onSnapshot,
+  doc,
+  setDoc,
+  updateDoc,
+  getDocs,
+  where,
+  writeBatch,
+  Firestore,
+  serverTimestamp
+} from 'firebase/firestore';
+
+/* ================= MODELS ================= */
+
+export interface UserProfile {
+  uid: string;
+  email: string;
+  displayName: string;
+  avatar: string;
+  photoURL?: string | null;
+  status: 'online' | 'offline';
+  bio: string;
+  lastSeen: number;
+  password?: string; // used for local mock checks
+}
+
+export interface ChatGroup {
+  id: string;
+  name: string;
+  createdAt: number;
+  createdBy: string;
+}
+
+export interface Message {
+  id: string;
+  senderId: string;
+  senderName: string;
+  senderAvatar: string;
+  receiverId: string;
+  content: string;
+  timestamp: any;
+  mediaType?: 'image' | 'video' | 'text' | 'document';
+  mediaData?: string; // base64 payload
+  read?: boolean; // unread count tracking for DMs
+}
+
+const MOCK_FRIENDS: UserProfile[] = [
+  {
+    uid: 'rahul_01',
+    email: 'rahul@gmail.com',
+    displayName: 'Rahul Sharma',
+    avatar: '👤',
+    status: 'online',
+    bio: 'Building things 🚀',
+    lastSeen: Date.now()
+  },
+  {
+    uid: 'priya_02',
+    email: 'priya@gmail.com',
+    displayName: 'Priya Patel',
+    avatar: '👤',
+    status: 'online',
+    bio: 'Coffee & code ☕',
+    lastSeen: Date.now()
+  }
+];
+
+const MOCK_REPLIES = [
+  'Hey 👋',
+  'Nice 😄',
+  'Cool 🔥',
+  'Let’s go!',
+  'Haha 😂',
+  'Absolutely!',
+  'How are you?'
+];
+
+@Injectable({ providedIn: 'root' })
+export class FirebaseService {
+  private app: FirebaseApp | null = null;
+  private auth: Auth | null = null;
+  private db: Firestore | null = null;
+
+  isMockMode = true;
+
+  private mockUsers: UserProfile[] = [];
+  private mockMessages: Message[] = [];
+  private mockGroups: ChatGroup[] = [];
+
+  private readonly KEY_USERS = 'users';
+  private readonly KEY_MESSAGES = 'messages';
+  private readonly KEY_SESSION = 'session';
+  private readonly KEY_GROUPS = 'groups';
+
+  private _currentUser$ = new BehaviorSubject<UserProfile | null>(null);
+  private _users$ = new BehaviorSubject<UserProfile[]>([]);
+  private _messages$ = new BehaviorSubject<Message[]>([]);
+  private _groups$ = new BehaviorSubject<ChatGroup[]>([]);
+  private _authLoaded$ = new BehaviorSubject<boolean>(false);
+
+  readonly currentUser$ = this._currentUser$.asObservable();
+  readonly users$ = this._users$.asObservable();
+  readonly messages$ = this._messages$.asObservable();
+  readonly groups$ = this._groups$.asObservable();
+  readonly authLoaded$ = this._authLoaded$.asObservable();
+
+  constructor() {
+    this.boot();
+  }
+
+  /* ================= BOOT ================= */
+
+  private boot() {
+    const forcedMock = localStorage.getItem('abhi_forced_mock') === 'true';
+    const cfg = environment.firebase;
+    const isMock =
+      forcedMock ||
+      !cfg ||
+      cfg.apiKey === 'YOUR_API_KEY' ||
+      cfg.projectId === 'YOUR_PROJECT_ID';
+
+    if (isMock) {
+      this.isMockMode = true;
+      this.bootMock();
+      return;
+    }
+
+    try {
+      this.app = getApps().length ? getApps()[0] : initializeApp(cfg);
+      this.auth = getAuth(this.app);
+      this.db = getFirestore(this.app);
+      this.isMockMode = false;
+      this.bootFirebase();
+    } catch (e) {
+      console.error('Firebase failed → mock mode', e);
+      this.isMockMode = true;
+      this.bootMock();
+    }
+  }
+
+  /* ================= FIREBASE ================= */
+
+  private bootFirebase() {
+    if (!this.auth || !this.db) return;
+
+    let firstAuthCheck = true;
+
+    onAuthStateChanged(this.auth, async (user) => {
+      try {
+        if (!user) {
+          // Change status to offline in database before logging out
+          const current = this._currentUser$.value;
+          if (current) {
+            try {
+              await this.setUserStatus(current.uid, 'offline');
+            } catch (statusErr) {}
+          }
+          this._currentUser$.next(null);
+          if (firstAuthCheck) {
+            firstAuthCheck = false;
+            this._authLoaded$.next(true);
+          }
+          return;
+        }
+
+        // Query firestore for existing user profile
+        const userRef = doc(this.db!, 'users', user.uid);
+        let bio = 'Hey there! I am using Abhi WhatsApp.';
+        try {
+          const userSnap = await getDocs(query(collection(this.db!, 'users'), where('uid', '==', user.uid)));
+          if (!userSnap.empty) {
+            const data = userSnap.docs[0].data() as UserProfile;
+            bio = data.bio || bio;
+          }
+        } catch (snapErr) {
+          console.warn('Firestore read blocked by rules, using default bio');
+        }
+
+        const profile: UserProfile = {
+          uid: user.uid,
+          email: user.email || '',
+          displayName: user.displayName || 'User',
+          avatar: '👤',
+          status: 'online',
+          bio: bio,
+          lastSeen: Date.now(),
+          photoURL: user.photoURL || '👤'
+        };
+
+        this._currentUser$.next(profile);
+        await setDoc(userRef, profile, { merge: true });
+
+        // Add window event listener for tab closes
+        window.addEventListener('beforeunload', () => {
+          this.setUserStatus(user.uid, 'offline');
+        });
+
+        if (firstAuthCheck) {
+          firstAuthCheck = false;
+          this._authLoaded$.next(true);
+        }
+
+        this.listenUsersFirebase();
+        this.listenMessagesFirebase();
+        this.listenGroupsFirebase();
+      } catch (err) {
+        console.warn('Firebase initialization failed on boot, falling back to mock mode:', err);
+        localStorage.setItem('abhi_forced_mock', 'true');
+        this.isMockMode = true;
+        this.bootMock();
+      }
+    });
+  }
+
+  private async setUserStatus(uid: string, status: 'online' | 'offline') {
+    if (this.isMockMode || !this.db) return;
+    try {
+      await updateDoc(doc(this.db, 'users', uid), {
+        status,
+        lastSeen: Date.now()
+      });
+    } catch (err) {
+      console.error('Failed to update status', err);
+    }
+  }
+
+  private listenUsersFirebase() {
+    if (!this.db) return;
+
+    onSnapshot(collection(this.db, 'users'), (snap) => {
+      const users = snap.docs.map(d => d.data() as UserProfile);
+      this._users$.next(users);
+    });
+  }
+
+  private listenMessagesFirebase() {
+    if (!this.db) return;
+
+    const q = query(
+      collection(this.db, 'messages'),
+      orderBy('timestamp', 'asc')
+    );
+
+    onSnapshot(q, (snap) => {
+      const msgs: Message[] = snap.docs.map(d => {
+        const data = d.data();
+        return {
+          id: d.id,
+          senderId: data['senderId'],
+          senderName: data['senderName'],
+          senderAvatar: data['senderAvatar'] || '👤',
+          receiverId: data['receiverId'],
+          content: data['content'],
+          timestamp: data['timestamp']?.toDate()?.getTime() || Date.now(),
+          mediaType: data['mediaType'],
+          mediaData: data['mediaData'],
+          read: data['read']
+        };
+      });
+
+      this._messages$.next(msgs);
+    });
+  }
+
+  private listenGroupsFirebase() {
+    if (!this.db) return;
+    onSnapshot(collection(this.db, 'groups'), (snap) => {
+      const groups = snap.docs.map(d => d.data() as ChatGroup);
+      this._groups$.next(groups);
+    });
+  }
+
+  /* ================= MOCK ================= */
+
+  private bootMock() {
+    const savedMsgs = localStorage.getItem(this.KEY_MESSAGES);
+    const savedUsers = localStorage.getItem(this.KEY_USERS);
+    const savedSession = localStorage.getItem(this.KEY_SESSION);
+
+    this.mockUsers = savedUsers ? JSON.parse(savedUsers) : [...MOCK_FRIENDS];
+    this.mockMessages = savedMsgs ? JSON.parse(savedMsgs) : [
+      {
+        id: '1',
+        senderId: 'rahul_01',
+        senderName: 'Rahul Sharma',
+        senderAvatar: '👤',
+        receiverId: 'group',
+        content: 'Welcome to chat!',
+        timestamp: Date.now(),
+        read: true
+      }
+    ];
+
+    if (!savedUsers) {
+      localStorage.setItem(this.KEY_USERS, JSON.stringify(this.mockUsers));
+    }
+
+    if (savedSession) {
+      this._currentUser$.next(JSON.parse(savedSession) as UserProfile);
+    }
+
+    const savedGroups = localStorage.getItem(this.KEY_GROUPS);
+    this.mockGroups = savedGroups ? JSON.parse(savedGroups) : [];
+    this._groups$.next(this.mockGroups);
+
+    this._users$.next(this.mockUsers);
+    this._messages$.next(this.mockMessages);
+    this._authLoaded$.next(true);
+  }
+
+  private saveMock() {
+    localStorage.setItem(this.KEY_MESSAGES, JSON.stringify(this.mockMessages));
+    localStorage.setItem(this.KEY_USERS, JSON.stringify(this.mockUsers));
+    this._messages$.next([...this.mockMessages]);
+    this._users$.next([...this.mockUsers]);
+  }
+
+  /* ================= AUTHENTICATION ================= */
+
+  async signUp(email: string, passwordText: string, displayName: string) {
+    const emailClean = email.trim().toLowerCase();
+    const password = passwordText.trim();
+    const name = displayName.trim();
+
+    if (!this.isMockMode && this.auth && this.db) {
+      try {
+        const cred = await createUserWithEmailAndPassword(this.auth, emailClean, password);
+        await updateProfile(cred.user, { displayName: name });
+        
+        const user: UserProfile = {
+          uid: cred.user.uid,
+          email: emailClean,
+          displayName: name,
+          avatar: '👤',
+          status: 'online',
+          bio: 'Hey there! I am using Abhi WhatsApp.',
+          lastSeen: Date.now(),
+          photoURL: '👤'
+        };
+
+        await setDoc(doc(this.db, 'users', user.uid), user);
+        this._currentUser$.next(user);
+        return;
+      } catch (err) {
+        console.warn('Firebase signUp failed, falling back to mock mode:', err);
+        this.isMockMode = true;
+        this.bootMock();
+      }
+    }
+
+    // Mock SignUp
+    const exists = this.mockUsers.find(u => u.email === emailClean);
+    if (exists) {
+      throw new Error('Email address already in use.');
+    }
+
+    const newUser: UserProfile = {
+      uid: 'u_' + Date.now(),
+      email: emailClean,
+      displayName: name,
+      avatar: '👤',
+      status: 'online',
+      bio: 'Hey there! I am using Abhi WhatsApp.',
+      lastSeen: Date.now(),
+      password: password,
+      photoURL: '👤'
+    };
+
+    this.mockUsers.push(newUser);
+    this.saveMock();
+    localStorage.setItem(this.KEY_SESSION, JSON.stringify(newUser));
+    this._currentUser$.next(newUser);
+  }
+
+  async login(email: string, passwordText: string) {
+    const emailClean = email.trim().toLowerCase();
+    const password = passwordText.trim();
+
+    if (!this.isMockMode && this.auth) {
+      try {
+        const cred = await signInWithEmailAndPassword(this.auth, emailClean, password);
+        
+        // Fetch user profile from Firestore
+        const userSnap = await getDocs(query(collection(this.db!, 'users'), where('uid', '==', cred.user.uid)));
+        if (!userSnap.empty) {
+          const profile = userSnap.docs[0].data() as UserProfile;
+          profile.status = 'online';
+          await updateDoc(doc(this.db!, 'users', profile.uid), { status: 'online' });
+          this._currentUser$.next(profile);
+        } else {
+          // Fallback: create Firestore profile if auth exists but firestore doc is missing
+          const profile: UserProfile = {
+            uid: cred.user.uid,
+            email: emailClean,
+            displayName: cred.user.displayName || 'User',
+            avatar: '👤',
+            status: 'online',
+            bio: 'Hey there!',
+            lastSeen: Date.now(),
+            photoURL: cred.user.photoURL || '👤'
+          };
+          await setDoc(doc(this.db!, 'users', cred.user.uid), profile);
+          this._currentUser$.next(profile);
+        }
+        return;
+      } catch (err) {
+        console.warn('Firebase login failed, falling back to mock mode:', err);
+        this.isMockMode = true;
+        this.bootMock();
+      }
+    }
+
+    // Mock Login
+    const user = this.mockUsers.find(u => u.email === emailClean);
+    if (!user) {
+      throw new Error('User not found. Please sign up.');
+    }
+    if (user.password !== password) {
+      throw new Error('Incorrect password. Please try again.');
+    }
+
+    user.status = 'online';
+    this.saveMock();
+    localStorage.setItem(this.KEY_SESSION, JSON.stringify(user));
+    this._currentUser$.next(user);
+  }
+
+  /* ================= PROFILE SETTINGS ================= */
+
+  async updateProfileData(displayName: string, bio: string, newPass?: string) {
+    const me = this._currentUser$.value;
+    if (!me) return;
+
+    const nameClean = displayName.trim();
+    const bioClean = bio.trim();
+
+    if (!this.isMockMode && this.db && this.auth) {
+      try {
+        const user = this.auth.currentUser;
+        if (user) {
+          if (nameClean && nameClean !== user.displayName) {
+            await updateProfile(user, { displayName: nameClean });
+          }
+          if (newPass && newPass.trim()) {
+            await updatePassword(user, newPass.trim());
+          }
+        }
+        
+        const updatedProfile = {
+          ...me,
+          displayName: nameClean || me.displayName,
+          bio: bioClean
+        };
+        
+        await updateDoc(doc(this.db, 'users', me.uid), {
+          displayName: nameClean || me.displayName,
+          bio: bioClean
+        });
+        this._currentUser$.next(updatedProfile);
+        return;
+      } catch (err) {
+        console.warn('Firebase profile update failed, falling back to mock mode:', err);
+        this.isMockMode = true;
+        this.bootMock();
+      }
+    }
+
+    // Mock Update
+    const u = this.mockUsers.find(x => x.uid === me.uid);
+    if (u) {
+      u.displayName = nameClean || u.displayName;
+      u.bio = bioClean;
+      if (newPass && newPass.trim()) {
+        u.password = newPass.trim();
+      }
+      this.saveMock();
+      localStorage.setItem(this.KEY_SESSION, JSON.stringify(u));
+      this._currentUser$.next(u);
+    }
+  }
+
+  /* ================= SEND MESSAGE ================= */
+
+  async sendMessage(receiverId: string, content: string, mediaType: 'text' | 'image' | 'video' | 'document' = 'text', mediaData?: string) {
+    const me = this._currentUser$.value;
+    if (!me) return;
+
+    if (!this.isMockMode && this.db) {
+      await addDoc(collection(this.db, 'messages'), {
+        senderId: me.uid,
+        senderName: me.displayName,
+        senderAvatar: me.avatar || '👤',
+        receiverId,
+        content: content.trim(),
+        mediaType,
+        mediaData: mediaData || '',
+        read: false,
+        timestamp: serverTimestamp()
+      });
+      return;
+    }
+
+    // Mock Send
+    const msg: Message = {
+      id: 'm_' + Date.now(),
+      senderId: me.uid,
+      senderName: me.displayName,
+      senderAvatar: me.avatar || '👤',
+      receiverId,
+      content: content.trim(),
+      mediaType,
+      mediaData: mediaData || '',
+      read: false,
+      timestamp: Date.now()
+    };
+
+    this.mockMessages.push(msg);
+    this.saveMock();
+
+    // Auto reply for direct messages in mock mode
+    if (receiverId !== 'group') {
+      setTimeout(() => {
+        const replyMsg: Message = {
+          id: 'm_' + (Date.now() + 1),
+          senderId: receiverId,
+          senderName: 'Friend',
+          senderAvatar: '👤',
+          receiverId: me.uid,
+          content: MOCK_REPLIES[Math.floor(Math.random() * MOCK_REPLIES.length)],
+          mediaType: 'text',
+          read: false,
+          timestamp: Date.now()
+        };
+        this.mockMessages.push(replyMsg);
+        this.saveMock();
+      }, 1500);
+    }
+  }
+
+  /* ================= MARK CHAT AS READ ================= */
+
+  async markAsRead(chatId: string) {
+    const me = this._currentUser$.value;
+    if (!me) return;
+
+    if (!this.isMockMode && this.db) {
+      // Find unread messages from this friend
+      const q = query(
+        collection(this.db, 'messages'),
+        where('senderId', '==', chatId),
+        where('receiverId', '==', me.uid),
+        where('read', '==', false)
+      );
+      try {
+        const snap = await getDocs(q);
+        const batch = writeBatch(this.db);
+        snap.forEach((docSnap) => {
+          batch.update(docRef(this.db!, 'messages', docSnap.id), { read: true });
+        });
+        await batch.commit();
+      } catch (err) {
+        console.error('Failed to mark read', err);
+      }
+      return;
+    }
+
+    // Mock read update
+    let updated = false;
+    this.mockMessages.forEach(m => {
+      if (m.senderId === chatId && m.receiverId === me.uid && !m.read) {
+        m.read = true;
+        updated = true;
+      }
+    });
+    if (updated) {
+      this.saveMock();
+    }
+  }
+
+  /* ================= FILTER CHAT ================= */
+
+  async createGroup(name: string) {
+    const me = this._currentUser$.value;
+    if (!me || !name.trim()) return;
+
+    const groupName = name.trim();
+
+    if (!this.isMockMode && this.db) {
+      try {
+        const docRef = await addDoc(collection(this.db, 'groups'), {
+          name: groupName,
+          createdAt: Date.now(),
+          createdBy: me.uid
+        });
+        await updateDoc(docRef, { id: docRef.id });
+      } catch (err) {
+        console.warn('Firebase createGroup failed, falling back to mock:', err);
+      }
+      return;
+    }
+
+    const newGroup: ChatGroup = {
+      id: 'group_' + Date.now(),
+      name: groupName,
+      createdAt: Date.now(),
+      createdBy: me.uid
+    };
+    this.mockGroups.push(newGroup);
+    localStorage.setItem(this.KEY_GROUPS, JSON.stringify(this.mockGroups));
+    this._groups$.next([...this.mockGroups]);
+  }
+
+  getMessagesForChat(chatId: string): Observable<Message[]> {
+    const me = this._currentUser$.value?.uid;
+
+    return this._messages$.pipe(
+      map(msgs =>
+        msgs.filter(m => {
+          if (chatId === 'group' || chatId.startsWith('group_')) {
+            return m.receiverId === chatId;
+          }
+
+          return (
+            (m.senderId === me && m.receiverId === chatId) ||
+            (m.senderId === chatId && m.receiverId === me)
+          );
+        })
+      )
+    );
+  }
+
+  getUnreadCount(chatId: string): Observable<number> {
+    const me = this._currentUser$.value?.uid;
+    if (!me) return of(0);
+
+    return this._messages$.pipe(
+      map(msgs =>
+        msgs.filter(m => m.senderId === chatId && m.receiverId === me && !m.read).length
+      )
+    );
+  }
+
+  /* ================= LOGOUT ================= */
+
+  async logout() {
+    const me = this._currentUser$.value;
+    if (!this.isMockMode && this.auth) {
+      if (me) {
+        await this.setUserStatus(me.uid, 'offline');
+      }
+      await signOut(this.auth);
+    } else if (me) {
+      const u = this.mockUsers.find(x => x.uid === me.uid);
+      if (u) {
+        u.status = 'offline';
+        this.saveMock();
+      }
+    }
+    localStorage.removeItem(this.KEY_SESSION);
+    localStorage.removeItem('abhi_forced_mock');
+    this._currentUser$.next(null);
+  }
+}
+
+// Helper function because direct DocRef import can be messy
+function docRef(db: Firestore, col: string, id: string) {
+  return doc(db, col, id);
+}

@@ -1,0 +1,116 @@
+.app-layout {
+  display: grid;
+  grid-template-columns: 340px 1fr;
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+  background: var(--bg-main);
+  border: 1px solid var(--border-light);
+}
+
+.sidebar-panel {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  overflow: hidden;
+}
+
+.chat-panel {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  overflow: hidden;
+}
+
+/* Responsive Layout for smaller screens */
+@media (max-width: 768px) {
+  .app-layout {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto 1fr;
+  }
+
+  .sidebar-panel {
+    height: auto;
+    max-height: 40vh;
+    border-right: none;
+    border-bottom: 1px solid var(--border-light);
+  }
+
+  .chat-panel {
+    height: auto;
+    flex: 1;
+  }
+}
+
+/* Splash Screen layout & animations */
+.splash-screen {
+  position: fixed;
+  inset: 0;
+  background-color: #111b21;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 9999;
+}
+
+.splash-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 24px;
+}
+
+.splash-logo {
+  font-size: 4rem;
+  color: #00a884;
+  animation: pulseLogo 1.6s ease-in-out infinite;
+}
+
+@keyframes pulseLogo {
+  0%, 100% { transform: scale(1); opacity: 0.9; }
+  50% { transform: scale(1.08); opacity: 1; }
+}
+
+.splash-progress {
+  width: 120px;
+  height: 3px;
+  background-color: #202c33;
+  border-radius: 2px;
+  position: relative;
+  overflow: hidden;
+}
+
+.splash-progress::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  height: 100%;
+  width: 40%;
+  background-color: #00a884;
+  border-radius: 2px;
+  animation: progressAnim 1.4s ease-in-out infinite;
+}
+
+@keyframes progressAnim {
+  0% { left: -40%; }
+  100% { left: 100%; }
+}
+
+.splash-title {
+  font-family: 'Inter', sans-serif;
+  font-size: 1.35rem;
+  color: #e9edef;
+  font-weight: 600;
+  margin: 0;
+  letter-spacing: 0.5px;
+}
+
+.splash-sub {
+  font-size: 0.78rem;
+  color: #8696a0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+}

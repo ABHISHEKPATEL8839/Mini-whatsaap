@@ -1,0 +1,161 @@
+<div class="chat-window">
+  <div class="chat-header">
+    <div class="chat-header-info">
+      @if (chatId === 'group') {
+      <div class="partner-avatar group-avatar-style">
+        <i class="bi bi-people-fill"></i>
+      </div>
+      } @else {
+      <div class="partner-avatar" [style.background-color]="getUserColor(chatPartner?.uid || '')">
+        {{ getUserInitials(chatPartner?.displayName || '') }}
+        <span class="header-status-dot" [class.online]="chatPartner?.status === 'online'"></span>
+      </div>
+      }
+      <div class="partner-details">
+        <h2 class="partner-name">{{ chatTitle }}</h2>
+        <span class="partner-status">{{ chatSubtitle }}</span>
+      </div>
+    </div>
+
+    <div class="chat-header-actions">
+      <button class="header-action-btn" title="Voice Call"><i class="bi bi-telephone"></i></button>
+      <button class="header-action-btn" title="Video Call"><i class="bi bi-camera-video"></i></button>
+      <button class="header-action-btn" title="More Options"><i class="bi bi-three-dots-vertical"></i></button>
+    </div>
+  </div>
+
+  <div class="messages-container" #messageContainer>
+    @if (messages().length === 0) {
+    <div class="empty-chat-state">
+      <div class="empty-icon"><i class="bi bi-chat-dots-fill"></i></div>
+      <p>No messages yet. Say hello!</p>
+      <span>Start the conversation below 👇</span>
+    </div>
+    }
+
+    @for (msg of messages(); track msg.id) {
+    <div class="message-row" [class.sent]="isSentByMe(msg)" [class.received]="!isSentByMe(msg)">
+      @if (!isSentByMe(msg)) {
+      <div class="msg-avatar" [style.background-color]="getUserColor(msg.senderId)" [title]="getSenderName(msg)">
+        {{ getUserInitials(getSenderName(msg)) }}
+      </div>
+      }
+
+      <div class="message-bubble-wrap">
+        @if (!isSentByMe(msg) && chatId === 'group') {
+        <span class="sender-label" [style.color]="getUserColor(msg.senderId)">
+          {{ getSenderName(msg) }}
+        </span>
+        }
+        <div class="message-bubble">
+          @if (msg.mediaType === 'image') {
+          <div class="msg-image-wrap">
+            <img [src]="msg.mediaData" alt="Image Attachment" class="bubble-image" />
+          </div>
+          } @else if (msg.mediaType === 'video') {
+          <div class="msg-video-wrap">
+            <video [src]="msg.mediaData" controls class="bubble-video"></video>
+          </div>
+          } @else if (msg.mediaType === 'document') {
+          <div class="msg-document-wrap">
+            <div class="document-icon">
+              <i class="bi bi-file-earmark-arrow-down-fill"></i>
+            </div>
+            <div class="document-details">
+              <span class="document-name" [title]="msg.content">{{ msg.content }}</span>
+              <a [href]="msg.mediaData" [download]="msg.content" class="document-download-btn">
+                <i class="bi bi-download"></i> Download
+              </a>
+            </div>
+          </div>
+          }
+
+          @if (msg.content && msg.mediaType !== 'document') {
+          <p class="message-text">{{ msg.content }}</p>
+          }
+
+          <div class="bubble-meta">
+            <span class="message-time">{{ formatTime(msg.timestamp) }}</span>
+            @if (isSentByMe(msg) && chatId !== 'group') {
+            <span class="read-receipt" [class.read]="msg.read">
+              @if (msg.read) {
+              <i class="bi bi-check-all"></i>
+              } @else {
+              <i class="bi bi-check"></i>
+              }
+            </span>
+            }
+          </div>
+        </div>
+      </div>
+    </div>
+    }
+  </div>
+
+  @if (selectedFileBase64()) {
+  <div class="media-preview-container">
+    <div class="preview-card">
+      @if (selectedFileType() === 'image') {
+      <img [src]="selectedFileBase64()" alt="Preview" class="preview-thumb" />
+      } @else if (selectedFileType() === 'video') {
+      <div class="preview-video-placeholder">
+        <i class="bi bi-play-btn-fill"></i>
+      </div>
+      } @else {
+      <div class="preview-video-placeholder" style="background: rgba(0, 168, 132, 0.1); color: var(--accent-emerald);">
+        <i class="bi bi-file-earmark-arrow-up-fill"></i>
+      </div>
+      }
+      <div class="preview-info">
+        <span class="preview-name">{{ selectedFileName() }}</span>
+        <span class="preview-size">Ready to send</span>
+      </div>
+      <button class="clear-preview-btn" (click)="clearSelectedFile()" title="Cancel attachment">
+        <i class="bi bi-x-circle-fill"></i>
+      </button>
+    </div>
+  </div>
+  }
+
+  @if (showEmojiPicker()) {
+  <div class="emoji-picker-container">
+    <div class="emoji-grid">
+      @for (emoji of emojis; track emoji) {
+      <button type="button" class="emoji-btn" (click)="addEmoji(emoji)">
+        {{ emoji }}
+      </button>
+      }
+    </div>
+  </div>
+  }
+
+  <div class="message-input-area">
+    <input type="file" #fileInput (change)="onFileSelected($event)" style="display: none;"
+      accept="image/*,video/*,.pdf,.doc,.docx,.txt,.zip" />
+
+    <div class="input-toolbar">
+      <button class="toolbar-btn" (click)="triggerFileSelect()" title="Attach Image/Video">
+        <i class="bi bi-paperclip"></i>
+      </button>
+      <button class="toolbar-btn" [class.active]="showEmojiPicker()" (click)="toggleEmojiPicker()" title="Emoji Picker">
+        <i class="bi bi-emoji-smile"></i>
+      </button>
+    </div>
+
+    <div class="input-field-wrapper">
+      <textarea id="message-input" class="message-textarea" placeholder="Type a message..." [ngModel]="messageText()"
+        (ngModelChange)="messageText.set($event)" (keydown)="onKeyDown($event)" rows="1"
+        [disabled]="isSending()"></textarea>
+    </div>
+
+    <button class="send-btn" [class.active]="messageText().trim() || selectedFileBase64()"
+      [disabled]="(!messageText().trim() && !selectedFileBase64()) || isSending()" (click)="sendMessage()"
+      id="send-button" title="Send Message">
+      @if (isSending()) {
+      <span class="send-spinner"></span>
+      } @else {
+      <span class="send-icon"><i class="bi bi-send-fill"></i></span>
+      }
+    </button>
+  </div>
+</div>

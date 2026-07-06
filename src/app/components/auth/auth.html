@@ -1,0 +1,124 @@
+<div class="auth-page">
+  <div class="auth-card">
+    <div class="brand">
+      <div class="logo">
+        <i class="bi bi-chat-text-fill brand-logo-icon"></i>
+      </div>
+      <h1>Abhi WhatsApp</h1>
+      <p class="sub">
+        {{ isSignUp() ? 'Create an account to join the circle' : 'Log in to connect with friends' }}
+      </p>
+    </div>
+
+    <form (ngSubmit)="submit()" class="form">
+      <!-- Name (Only shown on Sign Up) -->
+      @if (isSignUp()) {
+        <div class="field">
+          <label>Your Name</label>
+          <div class="input-box">
+            <span class="input-icon">
+              <i class="bi bi-person"></i>
+            </span>
+            <input
+              type="text"
+              name="username"
+              placeholder="Enter your name"
+              [ngModel]="name()"
+              (ngModelChange)="name.set($event)"
+              maxlength="30"
+              [disabled]="loading()"
+              required
+              autocomplete="off"
+            />
+          </div>
+        </div>
+      }
+
+      <!-- Email -->
+      <div class="field">
+        <label>Email Address</label>
+        <div class="input-box">
+          <span class="input-icon">
+            <i class="bi bi-envelope"></i>
+          </span>
+          <input
+            type="email"
+            name="email"
+            placeholder="Enter your email"
+            [ngModel]="email()"
+            (ngModelChange)="email.set($event)"
+            [disabled]="loading()"
+            required
+            autocomplete="off"
+          />
+        </div>
+      </div>
+
+      <!-- Password -->
+      <div class="field">
+        <label>Password</label>
+        <div class="input-box">
+          <span class="input-icon">
+            <i class="bi bi-lock"></i>
+          </span>
+          <input
+            [type]="showPassword() ? 'text' : 'password'"
+            name="password"
+            placeholder="Enter password"
+            [ngModel]="password()"
+            (ngModelChange)="password.set($event)"
+            maxlength="30"
+            [disabled]="loading()"
+            required
+          />
+          <button 
+            type="button" 
+            class="eye-btn" 
+            (click)="togglePasswordVisibility()" 
+            title="Toggle Password Visibility"
+          >
+            @if (showPassword()) {
+              <i class="bi bi-eye"></i>
+            } @else {
+              <i class="bi bi-eye-slash"></i>
+            }
+          </button>
+        </div>
+      </div>
+
+      <!-- Error -->
+      @if (error()) {
+        <div class="error">
+          <i class="bi bi-exclamation-triangle-fill"></i>
+          <span>{{ error() }}</span>
+        </div>
+      }
+
+      <!-- Submit Button -->
+      <button
+        type="submit"
+        class="submit-btn"
+        [disabled]="loading() || !email().trim() || !password().trim() || (isSignUp() && !name().trim())"
+      >
+        @if (loading()) {
+          <span class="spinner"></span> Processing...
+        } @else {
+          {{ isSignUp() ? 'Create Account' : 'Log In' }}
+        }
+      </button>
+    </form>
+
+    <!-- Toggle Mode Link -->
+    <div class="mode-toggle-link">
+      @if (isSignUp()) {
+        Already have an account? <span class="toggle-action" (click)="toggleMode()">Log In</span>
+      } @else {
+        Don't have an account? <span class="toggle-action" (click)="toggleMode()">Sign Up</span>
+      }
+    </div>
+
+    <div class="footer">
+      <i class="bi bi-shield-lock-fill"></i> Secure & Private Connection
+    </div>
+  </div>
+</div>

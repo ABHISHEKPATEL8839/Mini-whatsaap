@@ -1,0 +1,10 @@
+{
+  "hosting": {
+    "public": "dist/abhi-whatsapp/browser",
+    "ignore": [
+      "firebase.json",
+      "**/.*",
+      "**/node_modules/**"
+    ]
+  }
+}
