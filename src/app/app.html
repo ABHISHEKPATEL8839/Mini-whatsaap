@@ -1,3 +1,30 @@
+@if (incomingPendingInvitations().length > 0) {
+  <div class="toast-container position-fixed top-0 end-0 p-3" style="z-index: 1100;">
+    @for (invite of incomingPendingInvitations(); track invite.id) {
+      <div class="toast show text-bg-dark border-success shadow-lg mb-2" role="alert" style="display: block;">
+        <div class="toast-header bg-success text-white d-flex justify-content-between align-items-center">
+          <div class="d-flex align-items-center">
+            <i class="bi bi-person-plus-fill me-2"></i>
+            <strong class="me-auto">New Chat Request</strong>
+          </div>
+          <button type="button" class="btn-close btn-close-white" (click)="rejectInvite(invite.id)" aria-label="Close"></button>
+        </div>
+        <div class="toast-body">
+          <p class="mb-2"><strong>{{ invite.senderName }}</strong> ({{ invite.senderEmail }}) wants to chat with you.</p>
+          <div class="d-flex gap-2 mt-2">
+            <button class="btn btn-success btn-sm flex-fill" (click)="acceptInvite(invite.id)">
+              <i class="bi bi-check-lg"></i> Accept
+            </button>
+            <button class="btn btn-outline-danger btn-sm flex-fill text-white bg-danger bg-opacity-25" (click)="rejectInvite(invite.id)">
+              <i class="bi bi-x-lg"></i> Reject
+            </button>
+          </div>
+        </div>
+      </div>
+    }
+  </div>
+}
+
 @if (loadingAuth()) {
   <!-- Splash Screen shown during authentication loading state -->
   <div class="splash-screen">
@@ -15,28 +42,31 @@
   @if (!isLoggedIn()) {
     <app-auth (loginSuccess)="onLoginSuccess()"></app-auth>
   }
-
+ 
   <!-- Main App Layout (shown when logged in) -->
   @if (isLoggedIn()) {
-    <div class="app-layout animate-fade-in">
-      <!-- Left Sidebar -->
-      <aside class="sidebar-panel">
-        <app-sidebar
-          [currentUser]="currentUser()"
-          [activeChatId]="activeChatId()"
-          (chatSelected)="onChatSelected($event)"
-          (logoutRequested)="onLogoutRequested()"
-        ></app-sidebar>
-      </aside>
+    <div class="container-fluid p-0 h-100 overflow-hidden">
+      <div class="row g-0 h-100 app-layout">
+        <!-- Left Sidebar -->
+        <aside class="col-12 col-md-4 h-100 sidebar-panel d-md-block" [class.d-none]="mobileChatActive()">
+          <app-sidebar
+            [currentUser]="currentUser()"
+            [activeChatId]="activeChatId()"
+            (chatSelected)="onChatSelected($event)"
+            (logoutRequested)="onLogoutRequested()"
+          ></app-sidebar>
+        </aside>
 
-      <!-- Right Chat Panel -->
-      <main class="chat-panel">
-        <app-chat
-          [chatId]="activeChatId()"
-          [currentUser]="currentUser()"
-          [chatPartner]="activeChatPartner()"
-        ></app-chat>
-      </main>
+        <!-- Right Chat Panel -->
+        <main class="col-12 col-md-8 h-100 chat-panel d-md-block" [class.d-none]="!mobileChatActive()">
+          <app-chat
+            [chatId]="activeChatId()"
+            [currentUser]="currentUser()"
+            [chatPartner]="activeChatPartner()"
+            (backClicked)="goBackToSidebar()"
+          ></app-chat>
+        </main>
+      </div>
     </div>
   }
 }

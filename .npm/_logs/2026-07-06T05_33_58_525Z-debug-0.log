@@ -3,16 +3,16 @@
 2 info using node@v26.3.0
 3 silly config load:file:/home/abhishek/.nvm/versions/node/v26.3.0/lib/node_modules/npm/npmrc
 4 silly config load:file:/home/abhishek/Abhishek./.npmrc
-5 silly config load:file:/home/abhishek/Abhishek./etc/npmrc
-6 verbose title npm exec ng serve --port 4200 --host 0.0.0.0 --disable-host-check --no-open
-7 verbose argv "exec" "--prefix" "/home/abhishek/Abhishek." "--" "ng" "serve" "--port" "4200" "--host" "0.0.0.0" "--disable-host-check" "--no-open"
-8 verbose logfile logs-max:10 dir:/home/abhishek/Abhishek./.npm/_logs/2026-07-03T08_26_45_727Z-
-9 verbose logfile /home/abhishek/Abhishek./.npm/_logs/2026-07-03T08_26_45_727Z-debug-0.log
+5 silly config load:file:/home/abhishek/.nvm/versions/node/v26.3.0/etc/npmrc
+6 verbose title npm exec ng build --configuration development
+7 verbose argv "exec" "--" "ng" "build" "--configuration" "development"
+8 verbose logfile logs-max:10 dir:/home/abhishek/Abhishek./.npm/_logs/2026-07-06T05_33_58_525Z-
+9 verbose logfile /home/abhishek/Abhishek./.npm/_logs/2026-07-06T05_33_58_525Z-debug-0.log
 10 silly logfile start cleaning logs, removing 1 files
 11 silly logfile done cleaning log files
 12 verbose cwd /home/abhishek/Abhishek.
 13 verbose os Linux 6.8.0-124-generic
 14 verbose node v26.3.0
 15 verbose npm  v11.16.0
-16 verbose exit 1
-17 verbose code 1
+16 verbose exit 0
+17 info ok

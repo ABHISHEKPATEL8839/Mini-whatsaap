@@ -320,9 +320,15 @@
   color: #60a5fa !important;
 }
 
-.friends-scroll-area {
+.chats-list-scroll-area {
   flex: 1;
   overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  padding: 0 0 20px 0;
+}
+
+.friends-list-wrapper {
   padding: 0 8px;
   display: flex;
   flex-direction: column;

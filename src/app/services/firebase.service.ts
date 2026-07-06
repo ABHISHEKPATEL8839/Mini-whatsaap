@@ -28,7 +28,8 @@ import {
   where,
   writeBatch,
   Firestore,
-  serverTimestamp
+  serverTimestamp,
+  deleteDoc
 } from 'firebase/firestore';
 
 /* ================= MODELS ================= */
@@ -50,6 +51,18 @@ export interface ChatGroup {
   name: string;
   createdAt: number;
   createdBy: string;
+  members?: string[];
+}
+
+export interface Invitation {
+  id: string;
+  senderUid: string;
+  senderEmail: string;
+  senderName: string;
+  receiverUid: string;
+  receiverEmail: string;
+  status: 'pending' | 'accepted' | 'rejected';
+  timestamp: number;
 }
 
 export interface Message {
@@ -107,22 +120,26 @@ export class FirebaseService {
   private mockUsers: UserProfile[] = [];
   private mockMessages: Message[] = [];
   private mockGroups: ChatGroup[] = [];
+  private mockInvitations: Invitation[] = [];
 
   private readonly KEY_USERS = 'users';
   private readonly KEY_MESSAGES = 'messages';
   private readonly KEY_SESSION = 'session';
   private readonly KEY_GROUPS = 'groups';
+  private readonly KEY_INVITATIONS = 'invitations';
 
   private _currentUser$ = new BehaviorSubject<UserProfile | null>(null);
   private _users$ = new BehaviorSubject<UserProfile[]>([]);
   private _messages$ = new BehaviorSubject<Message[]>([]);
   private _groups$ = new BehaviorSubject<ChatGroup[]>([]);
+  private _invitations$ = new BehaviorSubject<Invitation[]>([]);
   private _authLoaded$ = new BehaviorSubject<boolean>(false);
 
   readonly currentUser$ = this._currentUser$.asObservable();
   readonly users$ = this._users$.asObservable();
   readonly messages$ = this._messages$.asObservable();
   readonly groups$ = this._groups$.asObservable();
+  readonly invitations$ = this._invitations$.asObservable();
   readonly authLoaded$ = this._authLoaded$.asObservable();
 
   constructor() {
@@ -224,6 +241,7 @@ export class FirebaseService {
         this.listenUsersFirebase();
         this.listenMessagesFirebase();
         this.listenGroupsFirebase();
+        this.listenInvitationsFirebase();
       } catch (err) {
         console.warn('Firebase initialization failed on boot, falling back to mock mode:', err);
         localStorage.setItem('abhi_forced_mock', 'true');
@@ -291,14 +309,24 @@ export class FirebaseService {
     });
   }
 
+  private listenInvitationsFirebase() {
+    if (!this.db) return;
+    onSnapshot(collection(this.db, 'invitations'), (snap) => {
+      const invites = snap.docs.map(d => d.data() as Invitation);
+      this._invitations$.next(invites);
+    });
+  }
+
   /* ================= MOCK ================= */
 
   private bootMock() {
     const savedMsgs = localStorage.getItem(this.KEY_MESSAGES);
     const savedUsers = localStorage.getItem(this.KEY_USERS);
     const savedSession = localStorage.getItem(this.KEY_SESSION);
+    const savedInvites = localStorage.getItem(this.KEY_INVITATIONS);
 
     this.mockUsers = savedUsers ? JSON.parse(savedUsers) : [...MOCK_FRIENDS];
+    this.mockInvitations = savedInvites ? JSON.parse(savedInvites) : [];
     this.mockMessages = savedMsgs ? JSON.parse(savedMsgs) : [
       {
         id: '1',
@@ -324,6 +352,7 @@ export class FirebaseService {
     this.mockGroups = savedGroups ? JSON.parse(savedGroups) : [];
     this._groups$.next(this.mockGroups);
 
+    this._invitations$.next(this.mockInvitations);
     this._users$.next(this.mockUsers);
     this._messages$.next(this.mockMessages);
     this._authLoaded$.next(true);
@@ -332,8 +361,10 @@ export class FirebaseService {
   private saveMock() {
     localStorage.setItem(this.KEY_MESSAGES, JSON.stringify(this.mockMessages));
     localStorage.setItem(this.KEY_USERS, JSON.stringify(this.mockUsers));
+    localStorage.setItem(this.KEY_INVITATIONS, JSON.stringify(this.mockInvitations));
     this._messages$.next([...this.mockMessages]);
     this._users$.next([...this.mockUsers]);
+    this._invitations$.next([...this.mockInvitations]);
   }
 
   /* ================= AUTHENTICATION ================= */
@@ -600,18 +631,20 @@ export class FirebaseService {
 
   /* ================= FILTER CHAT ================= */
 
-  async createGroup(name: string) {
+  async createGroup(name: string, members?: string[]) {
     const me = this._currentUser$.value;
     if (!me || !name.trim()) return;
 
     const groupName = name.trim();
+    const groupMembers = members || [me.uid];
 
     if (!this.isMockMode && this.db) {
       try {
         const docRef = await addDoc(collection(this.db, 'groups'), {
           name: groupName,
           createdAt: Date.now(),
-          createdBy: me.uid
+          createdBy: me.uid,
+          members: groupMembers
         });
         await updateDoc(docRef, { id: docRef.id });
       } catch (err) {
@@ -624,7 +657,8 @@ export class FirebaseService {
       id: 'group_' + Date.now(),
       name: groupName,
       createdAt: Date.now(),
-      createdBy: me.uid
+      createdBy: me.uid,
+      members: groupMembers
     };
     this.mockGroups.push(newGroup);
     localStorage.setItem(this.KEY_GROUPS, JSON.stringify(this.mockGroups));
@@ -680,6 +714,126 @@ export class FirebaseService {
     localStorage.removeItem(this.KEY_SESSION);
     localStorage.removeItem('abhi_forced_mock');
     this._currentUser$.next(null);
+  }
+
+  /* ================= INVITATIONS ACTIONS ================= */
+
+  async sendInvitation(emailText: string) {
+    const me = this._currentUser$.value;
+    if (!me) throw new Error('Not logged in.');
+    const targetEmail = emailText.trim().toLowerCase();
+    if (targetEmail === me.email.toLowerCase()) {
+      throw new Error('You cannot invite yourself.');
+    }
+
+    // Find receiver profile
+    let targetUser: UserProfile | undefined;
+    if (this.isMockMode) {
+      targetUser = this.mockUsers.find(u => u.email.toLowerCase() === targetEmail);
+    } else if (this.db) {
+      const userSnap = await getDocs(query(collection(this.db, 'users'), where('email', '==', targetEmail)));
+      if (!userSnap.empty) {
+        targetUser = userSnap.docs[0].data() as UserProfile;
+      }
+    }
+
+    if (!targetUser) {
+      throw new Error('User with this email not found.');
+    }
+
+    // Check if invitation already exists
+    const existing = this._invitations$.value.find(i => 
+      (i.senderUid === me.uid && i.receiverUid === targetUser!.uid) ||
+      (i.senderUid === targetUser!.uid && i.receiverUid === me.uid)
+    );
+
+    if (existing) {
+      if (existing.status === 'accepted') {
+        throw new Error('You are already connected with this user.');
+      } else if (existing.status === 'pending') {
+        if (existing.senderUid === me.uid) {
+          throw new Error('Invitation already sent and pending.');
+        } else {
+          throw new Error('This user has already sent you an invitation. Check invitations.');
+        }
+      } else {
+        // Reset status to pending
+        if (this.isMockMode) {
+          existing.status = 'pending';
+          existing.senderUid = me.uid;
+          existing.senderName = me.displayName;
+          existing.senderEmail = me.email;
+          existing.receiverUid = targetUser.uid;
+          existing.receiverEmail = targetUser.email;
+          existing.timestamp = Date.now();
+          this.saveMock();
+        } else if (this.db) {
+          await setDoc(doc(this.db, 'invitations', existing.id), {
+            status: 'pending',
+            senderUid: me.uid,
+            senderName: me.displayName,
+            senderEmail: me.email,
+            receiverUid: targetUser.uid,
+            receiverEmail: targetUser.email,
+            timestamp: Date.now()
+          }, { merge: true });
+        }
+        return;
+      }
+    }
+
+    // Create new invitation
+    const id = this.isMockMode ? 'inv_' + Date.now() : doc(collection(this.db!, 'invitations')).id;
+    const invite: Invitation = {
+      id,
+      senderUid: me.uid,
+      senderEmail: me.email,
+      senderName: me.displayName,
+      receiverUid: targetUser.uid,
+      receiverEmail: targetUser.email,
+      status: 'pending',
+      timestamp: Date.now()
+    };
+
+    if (this.isMockMode) {
+      this.mockInvitations.push(invite);
+      this.saveMock();
+    } else if (this.db) {
+      await setDoc(doc(this.db, 'invitations', id), invite);
+    }
+  }
+
+  async acceptInvitation(id: string) {
+    if (this.isMockMode) {
+      const invite = this.mockInvitations.find(i => i.id === id);
+      if (invite) {
+        invite.status = 'accepted';
+        this.saveMock();
+      }
+    } else if (this.db) {
+      await updateDoc(doc(this.db, 'invitations', id), { status: 'accepted' });
+    }
+  }
+
+  async rejectInvitation(id: string) {
+    if (this.isMockMode) {
+      const invite = this.mockInvitations.find(i => i.id === id);
+      if (invite) {
+        invite.status = 'rejected';
+        this.saveMock();
+      }
+    } else if (this.db) {
+      await updateDoc(doc(this.db, 'invitations', id), { status: 'rejected' });
+    }
+  }
+
+  async deleteInvitation(id: string) {
+    if (this.isMockMode) {
+      this.mockInvitations = this.mockInvitations.filter(i => i.id !== id);
+      this.saveMock();
+    } else if (this.db) {
+      await deleteDoc(doc(this.db, 'invitations', id));
+    }
   }
 }
 

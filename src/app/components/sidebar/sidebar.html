@@ -32,86 +32,182 @@
 
   <!-- Chats List Section -->
   <div class="chats-list">
-    <div class="list-section-title">
-      <span>GROUPS & CHANNELS</span>
-      <button class="add-group-btn" (click)="showCreateGroup.update(v => !v)" title="Create New Group">
-        <i class="bi bi-plus-lg"></i> Group
-      </button>
-    </div>
-
-    <!-- Create Group Inline Form -->
-    @if (showCreateGroup()) {
-    <div class="create-group-form animate-fade-in">
-      <input type="text" placeholder="Enter group name..." [ngModel]="newGroupName()"
-        (ngModelChange)="newGroupName.set($event)" (keydown.enter)="createGroup()" maxlength="25" />
-      <div class="create-group-actions">
-        <button class="cancel-grp-btn" (click)="showCreateGroup.set(false)">Cancel</button>
-        <button class="confirm-grp-btn" (click)="createGroup()" [disabled]="!newGroupName().trim()">Create</button>
-      </div>
-    </div>
-    }
-
-    <!-- Pinned Global Chat -->
-    <div class="chat-item pinned" [class.active]="activeChatId === 'group'" (click)="selectChat('group')">
-      <div class="chat-avatar-wrap group-avatar">
-        <div class="chat-avatar">
-          <i class="bi bi-people-fill"></i>
+    <div class="chats-list-scroll-area">
+      <div class="list-section-title">
+        <span>GROUPS & CHANNELS</span>
+        <div class="d-flex align-items-center">
+          <button class="add-group-btn me-2" (click)="showCreateGroup.update(v => !v); showAddFriend.set(false)" title="Create New Group">
+            <i class="bi bi-plus-lg"></i> Group
+          </button>
+          <button class="add-group-btn bg-success bg-opacity-25 border-success text-success" (click)="showAddFriend.update(v => !v); showCreateGroup.set(false)" title="Add Friend by Email">
+            <i class="bi bi-person-plus-fill"></i> Add Friend
+          </button>
         </div>
       </div>
-      <div class="chat-details">
-        <div class="chat-header-row">
-          <span class="chat-name">Global Circle</span>
-          <span class="chat-badge">GLOBAL</span>
-        </div>
-        <span class="chat-sub">Everyone in the friend circle</span>
-      </div>
-    </div>
 
-    @for (g of filteredGroups(); track g.id) {
-    <div class="chat-item" [class.active]="activeChatId === g.id" (click)="selectChat(g.id)">
-      <div class="chat-avatar-wrap group-avatar-style-dynamic" [style.background-color]="getUserColor(g.id)">
-        <div class="chat-avatar-initials">
-          {{ getUserInitials(g.name) }}
+      <!-- Create Group Inline Form -->
+      @if (showCreateGroup()) {
+      <div class="create-group-form animate-fade-in">
+        <input type="text" placeholder="Enter group name..." [ngModel]="newGroupName()"
+          (ngModelChange)="newGroupName.set($event)" (keydown.enter)="createGroup()" maxlength="25" />
+        
+        <!-- Select participants list -->
+        <label class="text-secondary small fw-bold mt-2 mb-1">Select Participants (Contacts)</label>
+        <div class="participants-list border border-secondary border-opacity-25 rounded p-2 overflow-y-auto" style="max-height: 120px; background: rgba(0,0,0,0.2);">
+          @for (friend of friends(); track friend.uid) {
+            <div class="form-check d-flex align-items-center gap-2 mb-1">
+              <input type="checkbox" class="form-check-input" [id]="'member-' + friend.uid"
+                [checked]="isMemberSelected(friend.uid)" (click)="toggleMemberSelection(friend.uid)" style="cursor: pointer;" />
+              <label class="form-check-label text-white small" [for]="'member-' + friend.uid" style="cursor: pointer; user-select: none;">
+                {{ friend.displayName }}
+              </label>
+            </div>
+          } @empty {
+            <div class="text-muted small text-center py-2">No friends available to add. Add friends by email first!</div>
+          }
         </div>
-      </div>
-      <div class="chat-details">
-        <div class="chat-header-row">
-          <span class="chat-name">{{ g.name }}</span>
-          <span class="chat-badge group">GROUP</span>
-        </div>
-        <span class="chat-sub">Custom group channel</span>
-      </div>
-    </div>
-    }
 
-    <div class="list-section-title">FRIENDS ({{ filteredUsers().length }})</div>
-    <div class="friends-scroll-area">
-      @for (user of filteredUsers(); track user.uid) {
-      <div class="chat-item" [class.active]="activeChatId === user.uid" (click)="selectChat(user.uid)">
-        <div class="chat-avatar-wrap">
-          <div class="chat-avatar" [style.background-color]="getUserColor(user.uid)">
-            {{ getUserInitials(user.displayName) }}
+        <div class="create-group-actions">
+          <button class="cancel-grp-btn" (click)="showCreateGroup.set(false)">Cancel</button>
+          <button class="confirm-grp-btn" (click)="createGroup()" [disabled]="!newGroupName().trim()">Create</button>
+        </div>
+      </div>
+      }
+
+      <!-- Add Friend Inline Form -->
+      @if (showAddFriend()) {
+      <div class="create-group-form animate-fade-in p-3 bg-dark bg-opacity-50 border border-secondary border-opacity-25 rounded mb-2 mx-2">
+        <label class="text-secondary small fw-bold mb-1">Add User by Email</label>
+        <div class="d-flex gap-2">
+          <input type="email" placeholder="example@gmail.com" [ngModel]="inviteEmail()"
+            (ngModelChange)="inviteEmail.set($event)" (keydown.enter)="sendInvite()" 
+            class="form-control form-control-sm bg-dark text-white border-secondary" [disabled]="inviteLoading()" />
+          <button class="btn btn-success btn-sm px-3" (click)="sendInvite()" [disabled]="inviteLoading() || !inviteEmail().trim()">
+            @if (inviteLoading()) {
+              <span class="spinner-border spinner-border-sm" role="status"></span>
+            } @else {
+              Send
+            }
+          </button>
+        </div>
+        @if (inviteError()) {
+          <div class="text-danger small mt-1"><i class="bi bi-exclamation-circle-fill"></i> {{ inviteError() }}</div>
+        }
+        @if (inviteSuccess()) {
+          <div class="text-success small mt-1"><i class="bi bi-check-circle-fill"></i> {{ inviteSuccess() }}</div>
+        }
+      </div>
+      }
+
+      <!-- Invitations List -->
+      @if (receivedPendingInvitations().length > 0 || sentInvitations().length > 0) {
+        <div class="list-section-title mt-2">
+          <span>PENDING REQUESTS</span>
+        </div>
+        <div class="px-2 pb-2 overflow-y-auto" style="max-height: 200px;">
+          <!-- Received pending requests -->
+          @for (invite of receivedPendingInvitations(); track invite.id) {
+            <div class="card bg-dark text-white border-success mb-2 p-2" style="font-size: 0.85rem;">
+              <div class="d-flex justify-content-between align-items-center mb-1">
+                <span class="text-success fw-bold"><i class="bi bi-box-arrow-in-down"></i> Received Request</span>
+                <span class="text-muted small" style="font-size: 0.75rem;">Pending</span>
+              </div>
+              <div class="mb-2"><strong>{{ invite.senderName }}</strong> ({{ invite.senderEmail }}) wants to chat.</div>
+              <div class="d-flex gap-2">
+                <button class="btn btn-success btn-sm flex-fill py-0" style="font-size: 0.75rem;" (click)="acceptInvite(invite.id)">Accept</button>
+                <button class="btn btn-outline-danger btn-sm flex-fill py-0 text-white bg-danger bg-opacity-25" style="font-size: 0.75rem;" (click)="rejectInvite(invite.id)">Reject</button>
+              </div>
+            </div>
+          }
+
+          <!-- Sent requests (pending / rejected) -->
+          @for (invite of sentInvitations(); track invite.id) {
+            @if (invite.status !== 'accepted') {
+              <div class="card bg-dark text-white mb-2 p-2" [class.border-danger]="invite.status === 'rejected'" [class.border-secondary]="invite.status === 'pending'" style="font-size: 0.85rem;">
+                <div class="d-flex justify-content-between align-items-center mb-1">
+                  <span class="fw-bold" [class.text-danger]="invite.status === 'rejected'" [class.text-muted]="invite.status === 'pending'">
+                    <i class="bi bi-box-arrow-up"></i> Sent Request
+                  </span>
+                  <span class="badge" [class.bg-danger]="invite.status === 'rejected'" [class.bg-secondary]="invite.status === 'pending'" style="font-size: 0.7rem;">
+                    {{ invite.status | uppercase }}
+                  </span>
+                </div>
+                <div class="mb-2 text-truncate" title="{{ invite.receiverEmail }}">To: <strong>{{ invite.receiverEmail }}</strong></div>
+                <div class="d-flex justify-content-end">
+                  @if (invite.status === 'rejected') {
+                    <button class="btn btn-outline-light btn-sm py-0" style="font-size: 0.75rem;" (click)="deleteInvite(invite.id)">Dismiss</button>
+                  } @else {
+                    <button class="btn btn-outline-secondary btn-sm py-0 text-white bg-secondary bg-opacity-25" style="font-size: 0.75rem;" (click)="deleteInvite(invite.id)">Cancel</button>
+                  }
+                </div>
+              </div>
+            }
+          }
+        </div>
+      }
+
+      <!-- Pinned Global Chat -->
+      <div class="chat-item pinned" [class.active]="activeChatId === 'group'" (click)="selectChat('group')">
+        <div class="chat-avatar-wrap group-avatar">
+          <div class="chat-avatar">
+            <i class="bi bi-people-fill"></i>
           </div>
-          <span class="live-dot" [class.status-online]="user.status === 'online'"
-            [class.status-offline]="user.status === 'offline'"></span>
         </div>
         <div class="chat-details">
           <div class="chat-header-row">
-            <span class="chat-name">{{ user.displayName }}</span>
-            @if ((getUnreadCount(user.uid) | async); as count) {
-            @if (count > 0) {
-            <span class="unread-badge">{{ count }}</span>
-            }
-            }
+            <span class="chat-name">Global Circle</span>
+            <span class="chat-badge">GLOBAL</span>
           </div>
-          <span class="chat-sub">{{ user.bio || 'Hey there! I am using Abhi WhatsApp.' }}</span>
+          <span class="chat-sub">Everyone in the friend circle</span>
         </div>
       </div>
-      } @empty {
-      <div class="empty-list-state">
-        <span>No friends found</span>
+
+      @for (g of filteredGroups(); track g.id) {
+      <div class="chat-item" [class.active]="activeChatId === g.id" (click)="selectChat(g.id)">
+        <div class="chat-avatar-wrap group-avatar-style-dynamic" [style.background-color]="getUserColor(g.id)">
+          <div class="chat-avatar-initials">
+            {{ getUserInitials(g.name) }}
+          </div>
+        </div>
+        <div class="chat-details">
+          <div class="chat-header-row">
+            <span class="chat-name">{{ g.name }}</span>
+            <span class="chat-badge group">GROUP</span>
+          </div>
+          <span class="chat-sub">Custom group channel</span>
+        </div>
       </div>
       }
+
+      <div class="list-section-title">FRIENDS ({{ filteredUsers().length }})</div>
+      <div class="friends-list-wrapper">
+        @for (user of filteredUsers(); track user.uid) {
+        <div class="chat-item" [class.active]="activeChatId === user.uid" (click)="selectChat(user.uid)">
+          <div class="chat-avatar-wrap">
+            <div class="chat-avatar" [style.background-color]="getUserColor(user.uid)">
+              {{ getUserInitials(user.displayName) }}
+            </div>
+            <span class="live-dot" [class.status-online]="user.status === 'online'"
+              [class.status-offline]="user.status === 'offline'"></span>
+          </div>
+          <div class="chat-details">
+            <div class="chat-header-row">
+              <span class="chat-name">{{ user.displayName }}</span>
+              @if ((getUnreadCount(user.uid) | async); as count) {
+              @if (count > 0) {
+              <span class="unread-badge">{{ count }}</span>
+              }
+              }
+            </div>
+            <span class="chat-sub">{{ user.bio || 'Hey there! I am using Abhi WhatsApp.' }}</span>
+          </div>
+        </div>
+        } @empty {
+        <div class="empty-list-state">
+          <span>No friends found</span>
+        </div>
+        }
+      </div>
     </div>
   </div>
 

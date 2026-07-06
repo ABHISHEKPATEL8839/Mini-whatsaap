@@ -28,6 +28,11 @@ export class AuthComponent {
   toggleMode() {
     this.isSignUp.update(val => !val);
     this.error.set('');
+    this.email.set('');
+    this.password.set('');
+    this.name.set('');
+    this.avatar.set('👤');
+    this.showPassword.set(false);
   }
 
   togglePasswordVisibility() {

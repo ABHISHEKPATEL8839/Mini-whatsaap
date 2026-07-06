@@ -1,11 +1,11 @@
 import 'emoji-picker-element';
 import {
-  Component, Input, OnInit, OnDestroy, OnChanges, SimpleChanges,
-  signal, ViewChild, ElementRef, AfterViewChecked
+  Component, Input, Output, EventEmitter, OnInit, OnDestroy, OnChanges, SimpleChanges,
+  signal, ViewChild, ElementRef, AfterViewChecked, computed
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Subscription } from 'rxjs';
-import { FirebaseService, UserProfile, Message, ChatGroup } from '../../services/firebase.service';
+import { FirebaseService, UserProfile, Message, ChatGroup, Invitation } from '../../services/firebase.service';
 
 @Component({
   selector: 'app-chat',
@@ -18,11 +18,13 @@ export class ChatComponent implements OnInit, OnDestroy, OnChanges, AfterViewChe
   @Input() chatId = 'group';
   @Input() currentUser: UserProfile | null = null;
   @Input() chatPartner: UserProfile | null = null;
+  @Output() backClicked = new EventEmitter<void>();
 
   @ViewChild('messageContainer') private messageContainer!: ElementRef;
   @ViewChild('fileInput') private fileInput!: ElementRef;
 
   messages = signal<Message[]>([]);
+  invitations = signal<Invitation[]>([]);
   messageText = signal('');
   isSending = signal(false);
 
@@ -43,9 +45,45 @@ export class ChatComponent implements OnInit, OnDestroy, OnChanges, AfterViewChe
   users = signal<UserProfile[]>([]);
   groups = signal<ChatGroup[]>([]);
 
+  friendship = computed(() => {
+    const cid = this.chatId;
+    const me = this.currentUser?.uid;
+    if (cid === 'group' || cid.startsWith('group_') || !me || !this.chatPartner) {
+      return { isGroup: true, status: 'accepted', invite: null };
+    }
+
+    const invite = this.invitations().find(i =>
+      (i.senderUid === me && i.receiverUid === cid) ||
+      (i.senderUid === cid && i.receiverUid === me)
+    );
+
+    if (!invite) {
+      return { isGroup: false, status: 'none', invite: null };
+    }
+
+    return {
+      isGroup: false,
+      status: invite.status,
+      invite
+    };
+  });
+
+  isGroupMember = computed(() => {
+    const cid = this.chatId;
+    const me = this.currentUser?.uid;
+    if (cid === 'group') return true;
+    if (cid.startsWith('group_')) {
+      const g = this.groups().find(x => x.id === cid);
+      if (!g) return false;
+      return !g.members || (me && g.members.includes(me)) ? true : false;
+    }
+    return true;
+  });
+
   private msgSubscription: Subscription | null = null;
   private usersSubscription: Subscription | null = null;
   private groupsSubscription: Subscription | null = null;
+  private invitationsSubscription: Subscription | null = null;
   private shouldScrollToBottom = true;
 
   constructor(public firebaseService: FirebaseService) { }
@@ -57,6 +95,9 @@ export class ChatComponent implements OnInit, OnDestroy, OnChanges, AfterViewChe
     });
     this.groupsSubscription = this.firebaseService.groups$.subscribe(list => {
       this.groups.set(list);
+    });
+    this.invitationsSubscription = this.firebaseService.invitations$.subscribe(list => {
+      this.invitations.set(list);
     });
   }
 
@@ -94,6 +135,9 @@ export class ChatComponent implements OnInit, OnDestroy, OnChanges, AfterViewChe
     }
     if (this.groupsSubscription) {
       this.groupsSubscription.unsubscribe();
+    }
+    if (this.invitationsSubscription) {
+      this.invitationsSubscription.unsubscribe();
     }
   }
 
@@ -177,6 +221,10 @@ export class ChatComponent implements OnInit, OnDestroy, OnChanges, AfterViewChe
   }
 
   async sendMessage() {
+    if (this.friendship().status !== 'accepted' || !this.isGroupMember()) {
+      return;
+    }
+
     const text = this.messageText().trim();
     const mediaData = this.selectedFileBase64();
     const mediaType = this.selectedFileType() || 'text';
@@ -243,5 +291,27 @@ export class ChatComponent implements OnInit, OnDestroy, OnChanges, AfterViewChe
     }
     const index = Math.abs(hash) % colors.length;
     return colors[index];
+  }
+
+  goBack() {
+    this.backClicked.emit();
+  }
+
+  async sendInvite() {
+    if (this.chatPartner) {
+      try {
+        await this.firebaseService.sendInvitation(this.chatPartner.email);
+      } catch (err) {
+        console.error(err);
+      }
+    }
+  }
+
+  async acceptInvite(id: string) {
+    await this.firebaseService.acceptInvitation(id);
+  }
+
+  async rejectInvite(id: string) {
+    await this.firebaseService.rejectInvitation(id);
   }
 }
