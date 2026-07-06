@@ -304,12 +304,12 @@
 
   <!-- Sidebar Footer -->
   <div class="sidebar-footer">
-    <div class="connection-pill" [class.mock]="firebaseService.isMockMode">
+    <!-- <div class="connection-pill" [class.mock]="firebaseService.isMockMode">
       <span class="indicator-dot"></span>
-      <span>{{ firebaseService.isMockMode ? 'Mock' : 'Live' }}</span>
-    </div>
+      <span>{{ firebaseService.isMockMode ? 'Mock' : 'Live' }}</span> z
+    </div> -->
     <button class="logout-btn" (click)="logout()" title="Log Out">
-      <i class="bi bi-box-arrow-right"></i> Exit
+      <i class="bi bi-box-arrow-right"></i> Logout
     </button>
   </div>
   }
