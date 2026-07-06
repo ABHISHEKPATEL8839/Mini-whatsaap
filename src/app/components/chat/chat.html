@@ -45,7 +45,6 @@
         } @else {
         {{ getUserInitials(chatPartner?.displayName || '') }}
         }
-        <span class="header-status-dot" [class.online]="chatPartner?.status === 'online'"></span>
       </div>
       }
       <div class="partner-details">
@@ -165,16 +164,24 @@
 
     @for (msg of messages(); track msg.id) {
     <div class="message-row" [class.sent]="isSentByMe(msg)" [class.received]="!isSentByMe(msg)">
-      @if (!isSentByMe(msg)) {
-      <div class="msg-avatar overflow-hidden d-flex align-items-center justify-content-center"
+      <!-- @if (!isSentByMe(msg)) { -->
+      <!-- <div class="msg-avatar overflow-hidden d-flex align-items-center justify-content-center"
         [style.background-color]="getUserColor(msg.senderId)" [title]="getSenderName(msg)">
-        @if (getSenderAvatar(msg)) {
+  
         <img [src]="getSenderAvatar(msg)" alt="Avatar" class="w-100 h-100 object-fit-cover" />
         } @else {
         {{ getUserInitials(getSenderName(msg)) }}
         }
-      </div>
-      }
+      </div> -->
+      <!-- <div class="msg-avatar overflow-hidden d-flex align-items-center justify-content-center"
+        [style.background-color]="getUserColor(msg.senderId)">
+        @if (getSenderAvatar(msg)) {
+        <img [src]="getSenderAvatar(msg)" class="w-100 h-100 object-fit-cover" />
+        } @else {
+        {{ getUserInitials(getSenderName(msg)) }}
+        }
+      </div> -->
+      <!-- } -->
 
       <div class="message-bubble-wrap position-relative">
         @if (!isSentByMe(msg) && (chatId === 'group' || chatId.startsWith('group_'))) {
@@ -265,6 +272,7 @@
   <!-- ngx-emoji-mart Picker Component Container -->
   @if (showEmojiPicker()) {
   <emoji-mart (emojiSelect)="addEmojiMart($event)" [darkMode]="true"></emoji-mart>
+
   }
 
   <!-- Bottom Message Text Area & toolbar -->
