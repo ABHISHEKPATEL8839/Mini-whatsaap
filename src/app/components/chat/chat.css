@@ -1415,7 +1415,7 @@ transform:scale(1.1);
 
     z-index:9999;
 
-    animation: slideUp .35s ease;
+    animation: slideUpCentered .35s ease;
 
 }
 
@@ -1605,7 +1605,7 @@ transform:scale(1.1);
 
 
 
-@keyframes slideUp {
+@keyframes slideUpCentered {
 
     from {
 

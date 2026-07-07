@@ -224,59 +224,109 @@
       </div>
       }
 
-      <!-- Horizontal Status Stories Tray -->
-      <div class="status-stories-tray d-flex align-items-center gap-3 px-3 py-2 border-bottom border-secondary border-opacity-10 overflow-x-auto w-100">
-        <!-- My Status -->
-        <div class="status-tray-item text-center flex-shrink-0 position-relative">
-          <div class="status-avatar-circle" (click)="myStatuses().length > 0 ? openStoryViewer(currentUser?.uid || '') : myStatusFileInput.click()" style="cursor: pointer;">
-            <div class="status-avatar-inner overflow-hidden d-flex align-items-center justify-content-center"
-              [style.background-color]="getUserColor(currentUser?.uid || '')"
-              [class.has-status]="myStatuses().length > 0">
-              @if (currentUser?.avatar && currentUser?.avatar!.startsWith('data:image/')) {
-                <img [src]="currentUser?.avatar" alt="My Profile" class="w-100 h-100 object-fit-cover" />
-              } @else {
-                {{ getUserInitials(currentUser?.displayName || 'Me') }}
-              }
-            </div>
-            @if (myStatuses().length === 0) {
-              <div class="status-plus-badge d-flex align-items-center justify-content-center" (click)="$event.stopPropagation(); myStatusFileInput.click()">
-                <i class="bi bi-plus-lg text-white"></i>
-              </div>
+   
+<div class="status-actions mt-2">
+
+  <span>Add Status</span>
+
+  <button (click)="openStatusCreator('text')">
+    <i class="bi bi-fonts"></i>
+  </button>
+
+  <button (click)="myStatusFileInput.click()">
+    <i class="bi bi-camera-fill"></i>
+  </button>
+
+</div>
+<div class="status-container">
+
+<div class="status-stories-tray glass-status ">
+
+    <!-- My Status -->
+    <div class="status-item m-2">
+      <div class="status-avatar-wrapper"
+           (click)="myStatuses().length > 0 
+              ? openStoryViewer(currentUser?.uid || '') 
+              : myStatusFileInput.click()">
+
+        <div class="status-ring "
+             [class.active]="myStatuses().length > 0">
+
+          <div class="status-avatar"
+               [style.background-color]="getUserColor(currentUser?.uid || '')">
+
+            @if (currentUser?.avatar?.startsWith('data:image/')) {
+              <img [src]="currentUser?.photoURL">
+            } 
+            @else {
+              {{ getUserInitials(currentUser?.displayName || 'Me') }}
             }
+
           </div>
-          <span class="status-tray-label text-truncate text-secondary d-block mt-1">My Status</span>
-          
-          <input type="file" #myStatusFileInput (change)="onStatusFileSelected($event)" style="display: none;" accept="image/*,video/*" />
+
         </div>
 
-        <!-- Friends Statuses -->
-        @for (group of friendsStatuses(); track group.user.uid) {
-          <div class="status-tray-item text-center flex-shrink-0" (click)="openStoryViewer(group.user.uid)" style="cursor: pointer;">
-            <div class="status-avatar-circle">
-              <div class="status-avatar-inner overflow-hidden d-flex align-items-center justify-content-center has-status"
-                [style.background-color]="getUserColor(group.user.uid)">
-                @if (group.user.avatar && group.user.avatar.startsWith('data:image/')) {
-                  <img [src]="group.user.avatar" alt="Friend Profile" class="w-100 h-100 object-fit-cover" />
-                } @else {
-                  {{ getUserInitials(group.user.displayName) }}
-                }
-              </div>
-            </div>
-            <span class="status-tray-label text-truncate text-white d-block mt-1">{{ group.user.displayName }}</span>
+
+        @if(myStatuses().length === 0){
+          <div class="add-status">
+            <i class="bi bi-plus-lg"></i>
           </div>
         }
+
       </div>
 
-      <!-- Quick status creation triggers -->
-      <div class="d-flex justify-content-start gap-2 px-3 py-2 bg-dark bg-opacity-20 border-bottom border-secondary border-opacity-10" style="font-size: 0.8rem;">
-        <span class="text-secondary fw-bold me-2 align-self-center">Add Status:</span>
-        <button class="btn btn-sm btn-outline-secondary text-white py-0 px-2" (click)="openStatusCreator('text')">
-          <i class="bi bi-fonts"></i> Text
-        </button>
-        <button class="btn btn-sm btn-outline-secondary text-white py-0 px-2" (click)="myStatusFileInput.click()">
-          <i class="bi bi-camera-fill"></i> Media
-        </button>
+      <span>My Status</span>
+
+
+      <input #myStatusFileInput
+             type="file"
+             hidden
+             accept="image/*,video/*"
+             (change)="onStatusFileSelected($event)">
+    </div>
+
+
+
+    <!-- Friends Status -->
+    @for(group of friendsStatuses(); track group.user.uid){
+
+      <div class="status-item mt-2 mb-2"
+           (click)="openStoryViewer(group.user.uid)">
+
+        <div class="status-ring active">
+
+          <div class="status-avatar"
+               [style.background-color]="getUserColor(group.user.uid)">
+
+            @if(group.user.avatar?.startsWith('data:image/')){
+              <img [src]="group.user.avatar">
+            }
+            @else{
+              {{getUserInitials(group.user.displayName)}}
+            }
+
+          </div>
+
+        </div>
+
+
+        <span>
+          {{group.user.displayName}}
+        </span>
+
       </div>
+
+    }
+
+
+  </div>
+
+</div>
+
+
+
+
+
 
       <!-- List of Groups (no Global Chat) -->
       @for (g of filteredGroups(); track g.id) {
