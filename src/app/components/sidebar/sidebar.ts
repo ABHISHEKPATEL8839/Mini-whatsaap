@@ -1,13 +1,13 @@
 import { Component, Input, Output, EventEmitter, OnInit, OnDestroy, signal, computed, effect } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { AsyncPipe, UpperCasePipe } from '@angular/common';
+import { AsyncPipe, UpperCasePipe, DatePipe } from '@angular/common';
 import { Subscription, Observable } from 'rxjs';
-import { FirebaseService, UserProfile, ChatGroup, Invitation } from '../../services/firebase.service';
+import { FirebaseService, UserProfile, ChatGroup, Invitation, Status } from '../../services/firebase.service';
 
 @Component({
   selector: 'app-sidebar',
   standalone: true,
-  imports: [FormsModule, AsyncPipe, UpperCasePipe],
+  imports: [FormsModule, AsyncPipe, UpperCasePipe, DatePipe],
   templateUrl: './sidebar.html',
   styleUrl: './sidebar.css',
 })
@@ -40,6 +40,81 @@ export class SidebarComponent implements OnInit, OnDestroy {
   allUsers = signal<UserProfile[]>([]);
   groups = signal<ChatGroup[]>([]);
   invitations = signal<Invitation[]>([]);
+  allStatuses = signal<Status[]>([]);
+
+  // Status Creator signals
+  showStatusCreator = signal(false);
+  statusCreatorType = signal<'text' | 'image' | 'video'>('text');
+  statusText = signal('');
+  statusMediaBase64 = signal<string | null>(null);
+  statusMediaCaption = signal('');
+  readonly statusBgColors = ['#00a884', '#3b82f6', '#8b5cf6', '#ec4899', '#f97316', '#10b981', '#ef4444', '#14b8a6'];
+  statusBgColorIndex = signal(0);
+  statusBgColor = computed(() => this.statusBgColors[this.statusBgColorIndex()]);
+
+  // Status Viewer signals
+  activeStoryUserUid = signal<string | null>(null);
+  activeStoryIndex = signal(0);
+  storyReplyText = signal('');
+  showStoryViewers = signal(false);
+  storyProgress = signal(0);
+  private progressInterval: any = null;
+
+  groupedStatuses = computed(() => {
+    const statuses = this.allStatuses();
+    const map = new Map<string, { user: UserProfile | { uid: string, displayName: string, avatar: string }, items: Status[] }>();
+    const all = this.allUsers();
+    
+    statuses.forEach(s => {
+      const user = all.find(u => u.uid === s.uid) || { uid: s.uid, displayName: s.displayName, avatar: s.avatar };
+      if (!map.has(s.uid)) {
+        map.set(s.uid, { user, items: [] });
+      }
+      map.get(s.uid)!.items.push(s);
+    });
+    
+    map.forEach(val => {
+      val.items.sort((a, b) => a.timestamp - b.timestamp);
+    });
+    
+    return Array.from(map.values()).sort((a, b) => {
+      const timeA = a.items[a.items.length - 1].timestamp;
+      const timeB = b.items[b.items.length - 1].timestamp;
+      return timeB - timeA;
+    });
+  });
+
+  myStatuses = computed(() => {
+    const me = this.currentUser?.uid;
+    if (!me) return [];
+    return this.allStatuses()
+      .filter(s => s.uid === me)
+      .sort((a, b) => a.timestamp - b.timestamp);
+  });
+
+  friendsStatuses = computed(() => {
+    const me = this.currentUser?.uid;
+    if (!me) return [];
+    return this.groupedStatuses().filter(g => g.user.uid !== me);
+  });
+
+  storyViewerOpen = computed(() => this.activeStoryUserUid() !== null);
+
+  activeStoryList = computed(() => {
+    const uid = this.activeStoryUserUid();
+    if (!uid) return [];
+    if (uid === this.currentUser?.uid) {
+      return this.myStatuses();
+    }
+    const group = this.groupedStatuses().find(g => g.user.uid === uid);
+    return group ? group.items : [];
+  });
+
+  activeStory = computed(() => {
+    const list = this.activeStoryList();
+    const idx = this.activeStoryIndex();
+    return list.length > idx ? list[idx] : null;
+  });
 
   friends = computed(() => {
     const me = this.currentUser?.uid;
@@ -101,7 +176,7 @@ ngOnInit() {
 
   const checkLoaded = () => {
     loaded++;
-    if (loaded === 3) {
+    if (loaded === 4) {
       this.loading.set(false);
     }
   };
@@ -126,10 +201,18 @@ ngOnInit() {
       checkLoaded();
     })
   );
+
+  this.subs.push(
+    this.firebaseService.statuses$.subscribe(statuses => {
+      this.allStatuses.set(statuses);
+      checkLoaded();
+    })
+  );
 }
 
   ngOnDestroy() {
     this.subs.forEach(s => s.unsubscribe());
+    this.stopStoryTimer();
   }
 
   selectChat(id: string) {
@@ -198,6 +281,191 @@ async deleteInvite(id: string) {
       this.newBio.set(this.currentUser?.bio ?? '');
       this.editingBio.set(true);
     }
+  }
+
+  // ================= STATUS STORIES IMPLEMENTATION =================
+  openStatusCreator(type: 'text' | 'image' | 'video') {
+    this.statusCreatorType.set(type);
+    this.showStatusCreator.set(true);
+  }
+
+  onStatusFileSelected(event: any) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 15 * 1024 * 1024) {
+      alert('File size exceeds the 15MB limit.');
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      this.statusMediaBase64.set(reader.result as string);
+      if (file.type.startsWith('image/')) {
+        this.statusCreatorType.set('image');
+      } else if (file.type.startsWith('video/')) {
+        this.statusCreatorType.set('video');
+      } else {
+        alert('Unsupported file format. Please upload an image or a video.');
+        this.statusMediaBase64.set(null);
+      }
+    };
+    reader.readAsDataURL(file);
+  }
+
+  async uploadStatus() {
+    const type = this.statusCreatorType();
+    let content = '';
+    let caption: string | undefined = undefined;
+    let bgColor: string | undefined = undefined;
+
+    if (type === 'text') {
+      content = this.statusText().trim();
+      if (!content) return;
+      bgColor = this.statusBgColor();
+    } else {
+      content = this.statusMediaBase64() || '';
+      if (!content) return;
+      caption = this.statusMediaCaption().trim();
+    }
+
+    this.loading.set(true);
+    try {
+      await this.firebaseService.uploadStatus(type, content, caption, bgColor);
+      this.closeStatusCreator();
+    } catch (err) {
+      console.error('Failed to upload status:', err);
+    } finally {
+      this.loading.set(false);
+    }
+  }
+
+  closeStatusCreator() {
+    this.showStatusCreator.set(false);
+    this.statusText.set('');
+    this.statusMediaBase64.set(null);
+    this.statusMediaCaption.set('');
+    this.statusBgColorIndex.set(0);
+  }
+
+  cycleStatusBgColor() {
+    this.statusBgColorIndex.update(idx => (idx + 1) % this.statusBgColors.length);
+  }
+
+  openStoryViewer(uid: string) {
+    this.activeStoryUserUid.set(uid);
+    this.activeStoryIndex.set(0);
+    this.startStoryTimer();
+  }
+
+  startStoryTimer() {
+    this.stopStoryTimer();
+    this.storyProgress.set(0);
+    this.viewActiveStory();
+
+    this.progressInterval = setInterval(() => {
+      this.storyProgress.update(p => {
+        if (p >= 100) {
+          clearInterval(this.progressInterval);
+          this.nextStory();
+          return 100;
+        }
+        return p + 1;
+      });
+    }, 50);
+  }
+
+  stopStoryTimer() {
+    if (this.progressInterval) {
+      clearInterval(this.progressInterval);
+      this.progressInterval = null;
+    }
+  }
+
+  viewActiveStory() {
+    const story = this.activeStory();
+    if (story) {
+      this.firebaseService.viewStatus(story.id);
+    }
+  }
+
+  nextStory() {
+    this.stopStoryTimer();
+    const list = this.activeStoryList();
+    const currentIdx = this.activeStoryIndex();
+    
+    if (currentIdx < list.length - 1) {
+      this.activeStoryIndex.set(currentIdx + 1);
+      this.startStoryTimer();
+    } else {
+      const groups = this.friendsStatuses();
+      const currentUserUid = this.activeStoryUserUid();
+      const currentGroupIdx = groups.findIndex(g => g.user.uid === currentUserUid);
+      
+      if (currentUserUid !== this.currentUser?.uid && currentGroupIdx >= 0 && currentGroupIdx < groups.length - 1) {
+        const nextGroup = groups[currentGroupIdx + 1];
+        this.activeStoryUserUid.set(nextGroup.user.uid);
+        this.activeStoryIndex.set(0);
+        this.startStoryTimer();
+      } else {
+        this.closeStoryViewer();
+      }
+    }
+  }
+
+  prevStory() {
+    this.stopStoryTimer();
+    const currentIdx = this.activeStoryIndex();
+    
+    if (currentIdx > 0) {
+      this.activeStoryIndex.set(currentIdx - 1);
+      this.startStoryTimer();
+    } else {
+      const groups = this.friendsStatuses();
+      const currentUserUid = this.activeStoryUserUid();
+      const currentGroupIdx = groups.findIndex(g => g.user.uid === currentUserUid);
+      
+      if (currentUserUid !== this.currentUser?.uid && currentGroupIdx > 0) {
+        const prevGroup = groups[currentGroupIdx - 1];
+        this.activeStoryUserUid.set(prevGroup.user.uid);
+        this.activeStoryIndex.set(prevGroup.items.length - 1);
+        this.startStoryTimer();
+      } else {
+        this.startStoryTimer();
+      }
+    }
+  }
+
+  closeStoryViewer() {
+    this.stopStoryTimer();
+    this.activeStoryUserUid.set(null);
+    this.activeStoryIndex.set(0);
+    this.storyProgress.set(0);
+    this.showStoryViewers.set(false);
+  }
+
+  async replyToStory() {
+    const story = this.activeStory();
+    const reply = this.storyReplyText().trim();
+    if (!story || !reply) return;
+
+    try {
+      const recipientId = story.uid;
+      const messageContent = `💬 Status Reply:\n${reply}`;
+      await this.firebaseService.sendMessage(recipientId, messageContent, 'text');
+      this.storyReplyText.set('');
+      this.closeStoryViewer();
+    } catch (err) {
+      console.error('Failed to send status reply:', err);
+    }
+  }
+
+  getViewerNames(uids: string[]): string {
+    if (!uids || uids.length === 0) return 'No views yet';
+    const all = this.allUsers();
+    return uids
+      .map(uid => all.find(u => u.uid === uid)?.displayName || 'Unknown Teammate')
+      .join(', ');
   }
 
  async saveBio() {

@@ -22,6 +22,8 @@ export class ChatComponent implements OnInit, OnDestroy, OnChanges, AfterViewChe
 
   @ViewChild('messageContainer') private messageContainer!: ElementRef;
   @ViewChild('fileInput') private fileInput!: ElementRef;
+  @ViewChild('localVideo') private localVideo!: ElementRef<HTMLVideoElement>;
+  @ViewChild('remoteVideo') private remoteVideo!: ElementRef<HTMLVideoElement>;
 
   messages = signal<Message[]>([]);
   invitations = signal<Invitation[]>([]);
@@ -55,6 +57,7 @@ export class ChatComponent implements OnInit, OnDestroy, OnChanges, AfterViewChe
   incomingCall = signal<VoiceCall | null>(null);
   callMuted = signal(false);
   speakerEnabled = signal(true);
+  cameraEnabled = signal(true);
   callDuration = signal(0);
   isCallMinimized = signal(false);
   callVolume = signal(100);
@@ -758,7 +761,20 @@ loadChat(chatId: string) {
 
   async startVoiceCall() {
     try {
-      const callId = await this.firebaseService.initiateCall(this.chatId, this.isGroupChat ? 'group' : 'direct');
+      const callId = await this.firebaseService.initiateCall(this.chatId, this.isGroupChat ? 'group' : 'direct', false);
+      if (!this.isGroupChat) {
+        this.setupWebRTCPeer(callId, true);
+      } else {
+        this.joinGroupVoiceCall(callId);
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  }
+
+  async startVideoCall() {
+    try {
+      const callId = await this.firebaseService.initiateCall(this.chatId, this.isGroupChat ? 'group' : 'direct', true);
       if (!this.isGroupChat) {
         this.setupWebRTCPeer(callId, true);
       } else {
@@ -796,8 +812,21 @@ loadChat(chatId: string) {
 
   async setupWebRTCPeer(callId: string, isCaller: boolean) {
     try {
-      this.localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const isVideo = this.activeCall()?.isVideo || this.incomingCall()?.isVideo || false;
+      this.cameraEnabled.set(isVideo);
+      this.localStream = await navigator.mediaDevices.getUserMedia({
+        audio: true,
+        video: isVideo ? { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } } : false
+      });
       this.setupCallAudioVisualizer(this.localStream);
+
+      if (isVideo) {
+        setTimeout(() => {
+          if (this.localVideo && this.localVideo.nativeElement) {
+            this.localVideo.nativeElement.srcObject = this.localStream;
+          }
+        }, 100);
+      }
 
       const configuration = {
         iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
@@ -809,11 +838,21 @@ loadChat(chatId: string) {
       });
 
       this.peerConnection.ontrack = (event) => {
-        this.remoteAudio = new Audio();
-        this.remoteAudio.srcObject = event.streams[0];
-        this.remoteAudio.autoplay = true;
-        this.remoteAudio.volume = this.callVolume() / 100;
-        this.remoteAudio.play().catch(e => console.warn('Audio play block:', e));
+        const stream = event.streams[0];
+        if (isVideo) {
+          setTimeout(() => {
+            if (this.remoteVideo && this.remoteVideo.nativeElement) {
+              this.remoteVideo.nativeElement.srcObject = stream;
+              this.remoteVideo.nativeElement.volume = this.callVolume() / 100;
+            }
+          }, 100);
+        } else {
+          this.remoteAudio = new Audio();
+          this.remoteAudio.srcObject = stream;
+          this.remoteAudio.autoplay = true;
+          this.remoteAudio.volume = this.callVolume() / 100;
+          this.remoteAudio.play().catch(e => console.warn('Audio play block:', e));
+        }
       };
 
       this.peerConnection.onicecandidate = (event) => {
@@ -962,6 +1001,12 @@ loadChat(chatId: string) {
       this.remoteAudio.srcObject = null;
       this.remoteAudio = null;
     }
+    if (this.localVideo && this.localVideo.nativeElement) {
+      this.localVideo.nativeElement.srcObject = null;
+    }
+    if (this.remoteVideo && this.remoteVideo.nativeElement) {
+      this.remoteVideo.nativeElement.srcObject = null;
+    }
     if (this.callSignalSub) {
       this.callSignalSub.unsubscribe();
       this.callSignalSub = null;
@@ -1001,6 +1046,18 @@ loadChat(chatId: string) {
     this.callVolume.set(volume);
     if (this.remoteAudio) {
       this.remoteAudio.volume = volume / 100;
+    }
+    if (this.remoteVideo && this.remoteVideo.nativeElement) {
+      this.remoteVideo.nativeElement.volume = volume / 100;
+    }
+  }
+
+  toggleCamera() {
+    this.cameraEnabled.update(v => !v);
+    if (this.localStream) {
+      this.localStream.getVideoTracks().forEach(track => {
+        track.enabled = this.cameraEnabled();
+      });
     }
   }
 

@@ -811,3 +811,173 @@
     transform: rotate(360deg);
   }
 }
+
+/* ================= STATUS STORIES STYLING ================= */
+.status-stories-tray {
+  scrollbar-width: none; /* Hide standard scrollbar for clean layout */
+  background: rgba(32, 44, 51, 0.25);
+}
+
+.status-stories-tray::-webkit-scrollbar {
+  display: none;
+}
+
+.status-tray-item {
+  width: 68px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.status-avatar-circle {
+  width: 50px;
+  height: 50px;
+  position: relative;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.status-avatar-inner {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  font-size: 1rem;
+  font-weight: 600;
+  color: #fff;
+  text-transform: uppercase;
+}
+
+.status-avatar-inner.has-status {
+  border: 2px solid #00a884; /* Highlight user has status updates */
+  padding: 1px;
+}
+
+.status-plus-badge {
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #00a884;
+  border: 1.5px solid #111b21;
+  font-size: 9px;
+}
+
+.status-tray-label {
+  font-size: 0.72rem;
+  width: 100%;
+  text-align: center;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Status Creator Modal overlay */
+.status-creator-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(11, 20, 26, 0.85);
+  backdrop-filter: blur(8px);
+  z-index: 2000;
+}
+
+.status-creator-card {
+  width: 100%;
+  max-width: 460px;
+  border-radius: 16px;
+  background: #202c33;
+}
+
+.text-status-textarea {
+  width: 100%;
+  border: none;
+  background: transparent;
+  outline: none;
+  font-size: 1.5rem;
+  font-weight: 500;
+  resize: none;
+  height: 120px;
+}
+
+/* Status Viewer Overlay */
+.status-viewer-overlay {
+  position: fixed;
+  inset: 0;
+  background: #0b141a;
+  z-index: 3000;
+}
+
+.status-progress-grid {
+  width: 100%;
+  height: 3px;
+}
+
+.status-progress-segment {
+  background: rgba(255, 255, 255, 0.25);
+  border-radius: 2px;
+  height: 100%;
+  overflow: hidden;
+}
+
+.status-progress-fill {
+  background: #fff;
+  height: 100%;
+  width: 0;
+  transition: width 0.05s linear;
+}
+
+.status-viewer-content {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.text-story-canvas {
+  width: 100%;
+  max-width: 380px;
+  aspect-ratio: 9 / 16;
+  max-height: 70dvh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 12px;
+}
+
+.skip-story-zone {
+  position: absolute;
+  top: 0;
+  height: 100%;
+  width: 25%;
+  z-index: 10;
+  cursor: pointer;
+}
+
+.skip-story-zone.left-zone {
+  left: 0;
+}
+
+.skip-story-zone.right-zone {
+  right: 0;
+}
+
+.status-reply-box-wrap {
+  width: 100%;
+}
+
+.status-reply-input {
+  outline: none;
+  font-size: 0.9rem;
+}
+
+.animate-slide-up {
+  animation: slideUp 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes slideUp {
+  from { transform: translateY(15px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}

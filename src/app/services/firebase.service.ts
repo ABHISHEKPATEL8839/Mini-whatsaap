@@ -93,6 +93,20 @@ export interface VoiceCall {
   timestamp: number;
   offer?: any;
   answer?: any;
+  isVideo?: boolean; // added for video calls
+}
+
+export interface Status {
+  id: string;
+  uid: string;
+  displayName: string;
+  avatar: string;
+  type: 'text' | 'image' | 'video';
+  content: string; // text string, or base64 encoded media
+  caption?: string;
+  backgroundColor?: string; // used for text status backgrounds
+  timestamp: number;
+  views: string[]; // uids of users who viewed this status
 }
 
 const MOCK_FRIENDS: UserProfile[] = [
@@ -138,18 +152,21 @@ export class FirebaseService {
   private mockMessages: Message[] = [];
   private mockGroups: ChatGroup[] = [];
   private mockInvitations: Invitation[] = [];
+  private mockStatuses: Status[] = [];
 
   private readonly KEY_USERS = 'users';
   private readonly KEY_MESSAGES = 'messages';
   private readonly KEY_SESSION = 'session';
   private readonly KEY_GROUPS = 'groups';
   private readonly KEY_INVITATIONS = 'invitations';
+  private readonly KEY_STATUSES = 'statuses';
 
   private _currentUser$ = new BehaviorSubject<UserProfile | null>(null);
   private _users$ = new BehaviorSubject<UserProfile[]>([]);
   private _messages$ = new BehaviorSubject<Message[]>([]);
   private _groups$ = new BehaviorSubject<ChatGroup[]>([]);
   private _invitations$ = new BehaviorSubject<Invitation[]>([]);
+  private _statuses$ = new BehaviorSubject<Status[]>([]);
   private _authLoaded$ = new BehaviorSubject<boolean>(false);
   private _activeCall$ = new BehaviorSubject<VoiceCall | null>(null);
   private _incomingCall$ = new BehaviorSubject<VoiceCall | null>(null);
@@ -159,6 +176,7 @@ export class FirebaseService {
   readonly messages$ = this._messages$.asObservable();
   readonly groups$ = this._groups$.asObservable();
   readonly invitations$ = this._invitations$.asObservable();
+  readonly statuses$ = this._statuses$.asObservable();
   readonly authLoaded$ = this._authLoaded$.asObservable();
   readonly activeCall$ = this._activeCall$.asObservable();
   readonly incomingCall$ = this._incomingCall$.asObservable();
@@ -327,6 +345,7 @@ export class FirebaseService {
         this.listenGroupsFirebase();
         this.listenInvitationsFirebase();
         this.listenCallsFirebase();
+        this.listenStatusesFirebase();
       } catch (err) {
         console.warn('Firebase initialization failed on boot, falling back to mock mode:', err);
         localStorage.setItem('abhi_forced_mock', 'true');
@@ -409,6 +428,7 @@ export class FirebaseService {
     const savedUsers = localStorage.getItem(this.KEY_USERS);
     const savedSession = localStorage.getItem(this.KEY_SESSION);
     const savedInvites = localStorage.getItem(this.KEY_INVITATIONS);
+    const savedStatuses = localStorage.getItem(this.KEY_STATUSES);
 
     this.mockUsers = savedUsers ? JSON.parse(savedUsers) : [...MOCK_FRIENDS];
     this.mockInvitations = savedInvites ? JSON.parse(savedInvites) : [];
@@ -424,6 +444,11 @@ export class FirebaseService {
         read: true
       }
     ];
+
+    const now = Date.now();
+    const parsedStatuses: Status[] = savedStatuses ? JSON.parse(savedStatuses) : [];
+    this.mockStatuses = parsedStatuses.filter(s => now - s.timestamp < 24 * 60 * 60 * 1000);
+    localStorage.setItem(this.KEY_STATUSES, JSON.stringify(this.mockStatuses));
 
     if (!savedUsers) {
       localStorage.setItem(this.KEY_USERS, JSON.stringify(this.mockUsers));
@@ -446,6 +471,7 @@ export class FirebaseService {
     this._invitations$.next(this.mockInvitations);
     this._users$.next(this.mockUsers);
     this._messages$.next(this.mockMessages);
+    this._statuses$.next(this.mockStatuses);
     this._authLoaded$.next(true);
 
     window.addEventListener('storage', (event) => {
@@ -462,6 +488,11 @@ export class FirebaseService {
         } else if (event.key === this.KEY_INVITATIONS) {
           this.mockInvitations = event.newValue ? JSON.parse(event.newValue) : [];
           this._invitations$.next([...this.mockInvitations]);
+        } else if (event.key === this.KEY_STATUSES) {
+          const parsed = event.newValue ? JSON.parse(event.newValue) as Status[] : [];
+          const currentNow = Date.now();
+          this.mockStatuses = parsed.filter(s => currentNow - s.timestamp < 24 * 60 * 60 * 1000);
+          this._statuses$.next([...this.mockStatuses]);
         }
       }
     });
@@ -472,10 +503,12 @@ export class FirebaseService {
     localStorage.setItem(this.KEY_USERS, JSON.stringify(this.mockUsers));
     localStorage.setItem(this.KEY_INVITATIONS, JSON.stringify(this.mockInvitations));
     localStorage.setItem(this.KEY_GROUPS, JSON.stringify(this.mockGroups));
+    localStorage.setItem(this.KEY_STATUSES, JSON.stringify(this.mockStatuses));
     this._messages$.next([...this.mockMessages]);
     this._users$.next([...this.mockUsers]);
     this._invitations$.next([...this.mockInvitations]);
     this._groups$.next([...this.mockGroups]);
+    this._statuses$.next([...this.mockStatuses]);
   }
 
   /* ================= AUTHENTICATION ================= */
@@ -1111,7 +1144,7 @@ export class FirebaseService {
     });
   }
 
-  async initiateCall(chatId: string, type: 'direct' | 'group'): Promise<string> {
+  async initiateCall(chatId: string, type: 'direct' | 'group', isVideo = false): Promise<string> {
     const me = this._currentUser$.value;
     if (!me) throw new Error('Not logged in.');
 
@@ -1125,7 +1158,8 @@ export class FirebaseService {
       status: type === 'group' ? 'active' : 'calling',
       participants: [me.uid],
       speakers: [],
-      timestamp: Date.now()
+      timestamp: Date.now(),
+      isVideo
     };
 
     if (this.isMockMode) {
@@ -1259,6 +1293,94 @@ export class FirebaseService {
           });
         });
       });
+    }
+  }
+
+  private listenStatusesFirebase() {
+    if (!this.db) return;
+    onSnapshot(collection(this.db, 'statuses'), (snap) => {
+      const list = snap.docs.map(d => {
+        const data = d.data();
+        return {
+          id: d.id,
+          uid: data['uid'],
+          displayName: data['displayName'],
+          avatar: data['avatar'],
+          type: data['type'],
+          content: data['content'],
+          caption: data['caption'],
+          backgroundColor: data['backgroundColor'],
+          timestamp: data['timestamp'],
+          views: data['views'] || []
+        } as Status;
+      });
+      const now = Date.now();
+      const activeStatuses = list.filter(s => now - s.timestamp < 24 * 60 * 60 * 1000);
+      this._statuses$.next(activeStatuses);
+    });
+  }
+
+  async uploadStatus(type: 'text' | 'image' | 'video', content: string, caption?: string, backgroundColor?: string) {
+    const me = this._currentUser$.value;
+    if (!me) throw new Error('Not logged in.');
+
+    const status: Status = {
+      id: this.isMockMode ? 'status_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7) : doc(collection(this.db!, 'statuses')).id,
+      uid: me.uid,
+      displayName: me.displayName,
+      avatar: me.avatar || '👤',
+      type,
+      content,
+      timestamp: Date.now(),
+      views: []
+    };
+
+    if (caption !== undefined) {
+      status.caption = caption;
+    }
+    if (backgroundColor !== undefined) {
+      status.backgroundColor = backgroundColor;
+    }
+
+    if (this.isMockMode) {
+      this.mockStatuses.push(status);
+      this.saveMock();
+    } else if (this.db) {
+      await setDoc(doc(this.db, 'statuses', status.id), status);
+    }
+  }
+
+  async viewStatus(statusId: string) {
+    const me = this._currentUser$.value;
+    if (!me) return;
+
+    if (this.isMockMode) {
+      const status = this.mockStatuses.find(s => s.id === statusId);
+      if (status && !status.views.includes(me.uid)) {
+        status.views.push(me.uid);
+        this.saveMock();
+      }
+    } else if (this.db) {
+      try {
+        await updateDoc(doc(this.db, 'statuses', statusId), {
+          views: arrayUnion(me.uid)
+        });
+      } catch (err) {
+        console.error('Failed to view status in Firestore:', err);
+      }
+    }
+  }
+
+  async deleteStatus(statusId: string) {
+    if (this.isMockMode) {
+      this.mockStatuses = this.mockStatuses.filter(s => s.id !== statusId);
+      this.saveMock();
+    } else if (this.db) {
+      try {
+        await deleteDoc(doc(this.db, 'statuses', statusId));
+      } catch (err) {
+        console.error('Failed to delete status in Firestore:', err);
+      }
     }
   }
 }

@@ -74,7 +74,7 @@
 
       <!-- <button class="header-action-btn" (click)="startVoiceCall()" title="Start Online Voice Chat" type="button"><i
           class="bi bi-telephone"></i></button> -->
-      <button class="header-action-btn" title="Video Call" type="button"><i class="bi bi-camera-video"></i></button>
+      <button class="header-action-btn" (click)="startVideoCall()" title="Video Call" type="button"><i class="bi bi-camera-video"></i></button>
       <button class="header-action-btn" [class.active]="showOptionsMenu()" (click)="toggleOptionsMenu()"
         title="More Options" type="button">
         <i class="bi bi-three-dots-vertical"></i>
@@ -469,7 +469,7 @@
         <div class="pulse-ring ring-2"></div>
       </div>
       <h3 class="caller-name mt-4">{{ incomingCall()!.callerName }}</h3>
-      <p class="call-status text-secondary">Incoming WhatsApp Voice Call...</p>
+      <p class="call-status text-secondary">Incoming WhatsApp {{ incomingCall()!.isVideo ? 'Video' : 'Voice' }} Call...</p>
 
       <div class="call-actions-row mt-5">
         <button class="btn-decline-call" (click)="rejectVoiceCall()" title="Decline" type="button">
@@ -486,24 +486,37 @@
   <!-- Outgoing Call / Active 1-on-1 Call Overlay -->
   @if (activeCall() && activeCall()!.type === 'direct' && !incomingCall()) {
     @if (!isCallMinimized()) {
-      <div class="call-overlay-fullscreen animate-fade-in">
-        <div class="call-modal-card glassmorphic shadow-premium">
-          <button class="btn btn-link text-white p-0 position-absolute top-0 start-0 m-4 border-0 shadow-none" (click)="minimizeCall()" title="Minimize Call" type="button">
+      <div class="call-overlay-fullscreen animate-fade-in" [class.video-active]="activeCall()!.isVideo && activeCall()!.status === 'active'">
+        <div class="call-modal-card glassmorphic shadow-premium" [class.video-layout]="activeCall()!.isVideo">
+          <button class="btn btn-link text-white p-0 position-absolute top-0 start-0 m-4 border-0 shadow-none" style="z-index: 10;" (click)="minimizeCall()" title="Minimize Call" type="button">
             <i class="bi bi-fullscreen-exit fs-4"></i>
           </button>
           
-          <div class="caller-avatar-pulse-wrap">
-            <div class="caller-avatar" [style.background-color]="getUserColor(chatPartner?.uid || '')">
-              {{ getUserInitials(chatPartner?.displayName || 'Friend') }}
+          @if (activeCall()!.isVideo) {
+            <div class="video-streams-container">
+              <video #remoteVideo autoplay playsinline class="remote-video-feed" [class.hidden]="activeCall()!.status !== 'active'"></video>
+              @if (cameraEnabled()) {
+                <video #localVideo autoplay muted playsinline class="local-video-preview shadow-lg"></video>
+              }
             </div>
-            @if (activeCall()!.status === 'calling') {
-            <div class="pulse-ring ring-1"></div>
-            <div class="pulse-ring ring-2"></div>
-            }
-          </div>
-          <h3 class="caller-name mt-4">{{ chatPartner?.displayName || 'Friend' }}</h3>
+          }
+
+          @if (!activeCall()!.isVideo || activeCall()!.status === 'calling') {
+            <div class="caller-avatar-pulse-wrap">
+              <div class="caller-avatar" [style.background-color]="getUserColor(chatPartner?.uid || '')">
+                {{ getUserInitials(chatPartner?.displayName || 'Friend') }}
+              </div>
+              @if (activeCall()!.status === 'calling') {
+              <div class="pulse-ring ring-1"></div>
+              <div class="pulse-ring ring-2"></div>
+              }
+            </div>
+          }
+
+          <h3 class="caller-name mt-4" [class.d-none]="activeCall()!.isVideo && activeCall()!.status === 'active'">{{ chatPartner?.displayName || 'Friend' }}</h3>
           <p class="call-status" [class.text-success]="activeCall()!.status === 'active'"
-            [class.text-secondary]="activeCall()!.status === 'calling'">
+            [class.text-secondary]="activeCall()!.status === 'calling'"
+            [class.floating-status]="activeCall()!.isVideo && activeCall()!.status === 'active'">
             @if (activeCall()!.status === 'calling') {
             Ringing...
             } @else {
@@ -511,13 +524,21 @@
             }
           </p>
 
-          <canvas #callCanvas class="call-visualizer-canvas" width="220" height="220"></canvas>
+          @if (!activeCall()!.isVideo) {
+            <canvas #callCanvas class="call-visualizer-canvas" width="220" height="220"></canvas>
+          }
 
-          <div class="call-controls-bar mt-4">
+          <div class="call-controls-bar mt-4" style="z-index: 10;">
             <button class="control-circle-btn" [class.muted]="callMuted()" (click)="toggleMute()" title="Mute/Unmute"
               type="button">
               <i class="bi" [class.bi-mic-mute-fill]="callMuted()" [class.bi-mic-fill]="!callMuted()"></i>
             </button>
+            @if (activeCall()!.isVideo) {
+              <button class="control-circle-btn" [class.muted]="!cameraEnabled()" (click)="toggleCamera()" title="Toggle Camera"
+                type="button">
+                <i class="bi" [class.bi-camera-video-off-fill]="!cameraEnabled()" [class.bi-camera-video-fill]="cameraEnabled()"></i>
+              </button>
+            }
             <button class="control-circle-btn" [class.speaker-off]="!speakerEnabled()" (click)="toggleSpeaker()"
               title="Speaker" type="button">
               <i class="bi" [class.bi-volume-up-fill]="speakerEnabled()"
@@ -529,7 +550,7 @@
           </div>
 
           <!-- Volume Slider -->
-          <div class="volume-slider-wrap mt-4 d-flex align-items-center gap-2 w-100 px-4">
+          <div class="volume-slider-wrap mt-4 d-flex align-items-center gap-2 w-100 px-4" style="z-index: 10;">
             <i class="bi" [class.bi-volume-up-fill]="callVolume() > 50" [class.bi-volume-down-fill]="callVolume() <= 50 && callVolume() > 0" [class.bi-volume-mute-fill]="callVolume() === 0" style="color: var(--text-secondary);"></i>
             <input type="range" min="0" max="100" [value]="callVolume()" (input)="setVolume(+$any($event).target.value)" class="volume-range-input flex-fill" />
             <span class="small font-monospace text-muted" style="width: 28px;">{{ callVolume() }}%</span>
