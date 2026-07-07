@@ -624,3 +624,80 @@
 
 
 }
+<!-- ================= VOICE CALL UI ================= -->
+
+
+@if(activeCall() && !incomingCall()) {
+
+<div class="call-floating-bar shadow-lg">
+
+  <div class="call-user-info">
+
+    <div class="caller-avatar-small">
+      {{getUserInitials(chatPartner?.displayName || '')}}
+    </div>
+
+
+    <div class="caller-details">
+
+      <h6 class="mb-1">
+        {{chatPartner?.displayName}}
+      </h6>
+
+      <div class="call-timer">
+
+        <span class="online-dot"></span>
+
+        @if(activeCall()!.status==='calling'){
+          Calling...
+        }
+        @else{
+          {{formatDuration(callDuration())}}
+        }
+
+      </div>
+
+    </div>
+
+
+  </div>
+
+
+
+  <div class="call-controls">
+
+    <button 
+      class="call-control-btn mute-btn"
+      title="Mute">
+
+      <i class="bi bi-mic-fill"></i>
+
+    </button>
+
+
+    <button 
+      class="call-control-btn speaker-btn"
+      title="Speaker">
+
+      <i class="bi bi-volume-up-fill"></i>
+
+    </button>
+
+
+
+    <button 
+      class="hangup-btn"
+      (click)="endVoiceCall()"
+      title="End Call">
+
+      <i class="bi bi-telephone-x-fill"></i>
+
+    </button>
+
+
+  </div>
+
+
+</div>
+
+}
