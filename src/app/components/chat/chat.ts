@@ -56,6 +56,9 @@ export class ChatComponent implements OnInit, OnDestroy, OnChanges, AfterViewChe
   callMuted = signal(false);
   speakerEnabled = signal(true);
   callDuration = signal(0);
+  isCallMinimized = signal(false);
+  callVolume = signal(100);
+  private remoteAudio: HTMLAudioElement | null = null;
   private callDurationInterval: any = null;
   private peerConnection: RTCPeerConnection | null = null;
   private localStream: MediaStream | null = null;
@@ -299,29 +302,29 @@ export class ChatComponent implements OnInit, OnDestroy, OnChanges, AfterViewChe
     }
   }
 
- private subscribeToMessages() {
-  if (this.msgSubscription) {
-    this.msgSubscription.unsubscribe();
+  private subscribeToMessages() {
+    if (this.msgSubscription) {
+      this.msgSubscription.unsubscribe();
+    }
+
+    this.isChatLoading.set(true);
+
+    this.msgSubscription = this.firebaseService
+      .getMessagesForChat(this.chatId)
+      .subscribe({
+        next: (msgs) => {
+          this.messages.set(msgs);
+          this.shouldScrollToBottom = true;
+          setTimeout(() => {
+            this.isChatLoading.set(false);
+          }, 350);
+        },
+        error: (err) => {
+          console.error(err);
+          this.isChatLoading.set(false);
+        }
+      });
   }
-
-  this.isChatLoading.set(true);
-
-  this.msgSubscription = this.firebaseService
-    .getMessagesForChat(this.chatId)
-    .subscribe({
-      next: (msgs) => {
-        this.messages.set(msgs);
-        this.shouldScrollToBottom = true;
-
-        // Hide spinner after data arrives
-        this.isChatLoading.set(false);
-      },
-      error: (err) => {
-        console.error(err);
-        this.isChatLoading.set(false);
-      }
-    });
-}
 
   ngOnDestroy() {
     if (this.msgSubscription) {
@@ -806,10 +809,11 @@ loadChat(chatId: string) {
       });
 
       this.peerConnection.ontrack = (event) => {
-        const remoteAudio = new Audio();
-        remoteAudio.srcObject = event.streams[0];
-        remoteAudio.autoplay = true;
-        remoteAudio.play().catch(e => console.warn('Audio play block:', e));
+        this.remoteAudio = new Audio();
+        this.remoteAudio.srcObject = event.streams[0];
+        this.remoteAudio.autoplay = true;
+        this.remoteAudio.volume = this.callVolume() / 100;
+        this.remoteAudio.play().catch(e => console.warn('Audio play block:', e));
       };
 
       this.peerConnection.onicecandidate = (event) => {
@@ -943,6 +947,7 @@ loadChat(chatId: string) {
     clearInterval(this.callDurationInterval);
     clearInterval(this.speakingDetectorInterval);
     this.callDuration.set(0);
+    this.isCallMinimized.set(false);
 
     if (this.localStream) {
       this.localStream.getTracks().forEach(track => track.stop());
@@ -951,6 +956,11 @@ loadChat(chatId: string) {
     if (this.peerConnection) {
       this.peerConnection.close();
       this.peerConnection = null;
+    }
+    if (this.remoteAudio) {
+      this.remoteAudio.pause();
+      this.remoteAudio.srcObject = null;
+      this.remoteAudio = null;
     }
     if (this.callSignalSub) {
       this.callSignalSub.unsubscribe();
@@ -985,6 +995,21 @@ loadChat(chatId: string) {
 
   toggleSpeaker() {
     this.speakerEnabled.update(v => !v);
+  }
+
+  setVolume(volume: number) {
+    this.callVolume.set(volume);
+    if (this.remoteAudio) {
+      this.remoteAudio.volume = volume / 100;
+    }
+  }
+
+  minimizeCall() {
+    this.isCallMinimized.set(true);
+  }
+
+  maximizeCall() {
+    this.isCallMinimized.set(false);
   }
 
   playRingtone() {
