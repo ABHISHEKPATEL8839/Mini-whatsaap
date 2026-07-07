@@ -16,7 +16,7 @@ export class SidebarComponent implements OnInit, OnDestroy {
   @Input() activeChatId = '';
   @Output() chatSelected = new EventEmitter<string>();
   @Output() logoutRequested = new EventEmitter<void>();
-  viewMode = signal<'chats' | 'profile'>('chats');
+  viewMode = signal<'chats' | 'profile' | 'contacts'>('chats');
   searchQuery = signal('');
   newBio = signal('');
   editingBio = signal(false);
@@ -283,6 +283,17 @@ async deleteInvite(id: string) {
     await this.firebaseService.deleteInvitation(id);
   } finally {
     this.loading.set(false);
+  }
+}
+
+async removeFriend(uid: string) {
+  if (confirm('Are you sure you want to remove this friend? You will not be able to chat with them until you connect again.')) {
+    this.loading.set(true);
+    try {
+      await this.firebaseService.deleteFriend(uid);
+    } finally {
+      this.loading.set(false);
+    }
   }
 }
 

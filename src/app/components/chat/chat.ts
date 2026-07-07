@@ -276,14 +276,14 @@ export class ChatComponent implements OnInit, OnDestroy, OnChanges, AfterViewChe
     });
 
     this.activeCallSub = this.firebaseService.activeCall$.subscribe(call => {
-      const prevCall = this.activeCall();
       this.activeCall.set(call);
       if (call) {
         if (call.status === 'active') {
           this.stopRingtone();
           this.startCallTimer();
-          if (call.type === 'direct' && !this.peerConnection && prevCall?.status === 'calling') {
-            this.setupWebRTCPeer(call.id, false);
+          if (call.type === 'direct' && !this.peerConnection) {
+            const isCaller = call.callerId === this.currentUser?.uid;
+            this.setupWebRTCPeer(call.id, isCaller);
           }
         }
       } else {

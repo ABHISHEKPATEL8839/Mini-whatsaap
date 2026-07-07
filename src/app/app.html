@@ -1,29 +1,78 @@
-@if (incomingPendingInvitations().length > 0) {
-  <div class="toast-container position-fixed top-0 end-0 p-3" style="z-index: 1100;">
-    @for (invite of incomingPendingInvitations(); track invite.id) {
-      <div class="toast show text-bg-dark border-success shadow-lg mb-2" role="alert" style="display: block;">
-        <div class="toast-header bg-success text-white d-flex justify-content-between align-items-center">
-          <div class="d-flex align-items-center">
-            <i class="bi bi-person-plus-fill me-2"></i>
-            <strong class="me-auto">New Chat Request</strong>
-          </div>
-          <button type="button" class="btn-close btn-close-white" (click)="rejectInvite(invite.id)" aria-label="Close"></button>
+<div class="toast-container position-fixed top-0 end-0 p-3" style="z-index: 2100;">
+  <!-- Incoming Call Toast -->
+  @if (incomingCall(); as call) {
+    <div class="toast show text-bg-dark border-success shadow-lg mb-2 animate-fade-in" role="alert" style="display: block; min-width: 320px;">
+      <div class="toast-header bg-success text-white d-flex justify-content-between align-items-center">
+        <div class="d-flex align-items-center">
+          <i class="bi" [class.bi-camera-video-fill]="call.isVideo" [class.bi-telephone-fill]="!call.isVideo"></i>
+          <strong class="ms-2 me-auto">Incoming {{ call.isVideo ? 'Video' : 'Voice' }} Call</strong>
         </div>
-        <div class="toast-body">
-          <p class="mb-2"><strong>{{ invite.senderName }}</strong> ({{ invite.senderEmail }}) wants to chat with you.</p>
-          <div class="d-flex gap-2 mt-2">
-            <button class="btn btn-success btn-sm flex-fill" (click)="acceptInvite(invite.id)">
-              <i class="bi bi-check-lg"></i> Accept
-            </button>
-            <button class="btn btn-outline-danger btn-sm flex-fill text-white bg-danger bg-opacity-25" (click)="rejectInvite(invite.id)">
-              <i class="bi bi-x-lg"></i> Reject
-            </button>
+        <button type="button" class="btn-close btn-close-white" (click)="rejectCall()" aria-label="Close"></button>
+      </div>
+      <div class="toast-body text-center p-3">
+        <div class="d-flex align-items-center gap-3 mb-3">
+          <div class="caller-avatar rounded-circle d-flex align-items-center justify-content-center bg-success text-white fw-bold" style="width: 48px; height: 48px; font-size: 1.2rem;">
+            {{ getUserInitials(call.callerName) }}
           </div>
+          <div class="text-start">
+            <h6 class="mb-0 text-white fw-bold">{{ call.callerName }}</h6>
+            <span class="text-secondary small">Incoming WhatsApp call...</span>
+          </div>
+        </div>
+        <div class="d-flex gap-2">
+          <button class="btn btn-success btn-sm flex-fill py-2 fw-bold" (click)="acceptCall()">
+            <i class="bi bi-telephone-fill me-1"></i> Accept
+          </button>
+          <button class="btn btn-outline-danger btn-sm flex-fill py-2 fw-bold text-white bg-danger bg-opacity-25" (click)="rejectCall()">
+            <i class="bi bi-telephone-x-fill me-1"></i> Decline
+          </button>
         </div>
       </div>
-    }
-  </div>
-}
+    </div>
+  }
+
+  <!-- Pending Invitations -->
+  @for (invite of incomingPendingInvitations(); track invite.id) {
+    <div class="toast show text-bg-dark border-success shadow-lg mb-2" role="alert" style="display: block;">
+      <div class="toast-header bg-success text-white d-flex justify-content-between align-items-center">
+        <div class="d-flex align-items-center">
+          <i class="bi bi-person-plus-fill me-2"></i>
+          <strong class="me-auto">New Chat Request</strong>
+        </div>
+        <button type="button" class="btn-close btn-close-white" (click)="rejectInvite(invite.id)" aria-label="Close"></button>
+      </div>
+      <div class="toast-body">
+        <p class="mb-2"><strong>{{ invite.senderName }}</strong> wants to chat with you.</p>
+        <div class="d-flex gap-2 mt-2">
+          <button class="btn btn-success btn-sm flex-fill" (click)="acceptInvite(invite.id)">
+            <i class="bi bi-check-lg"></i> Accept
+          </button>
+          <button class="btn btn-outline-danger btn-sm flex-fill text-white bg-danger bg-opacity-25" (click)="rejectInvite(invite.id)">
+            <i class="bi bi-x-lg"></i> Reject
+          </button>
+        </div>
+      </div>
+    </div>
+  }
+
+  <!-- General Toasts (e.g. Call Ended, Call Connected, etc.) -->
+  @for (toast of toasts(); track toast.id) {
+    <div class="toast show text-bg-dark shadow-lg mb-2 border-0 animate-fade-in" role="alert" style="display: block; border-left: 4px solid var(--bs-info) !important;"
+      [style.border-left-color]="toast.type === 'success' ? '#10b981' : (toast.type === 'danger' ? '#ef4444' : (toast.type === 'warning' ? '#f59e0b' : '#3b82f6'))">
+      <div class="toast-header text-white d-flex justify-content-between align-items-center"
+        [class.bg-success]="toast.type === 'success'"
+        [class.bg-danger]="toast.type === 'danger'"
+        [class.bg-warning]="toast.type === 'warning'"
+        [class.bg-primary]="toast.type === 'info'">
+        <strong class="me-auto">{{ toast.title }}</strong>
+        <button type="button" class="btn-close btn-close-white" aria-label="Close" (click)="toasts.set(toasts().filter(t => t.id !== toast.id))"></button>
+      </div>
+      <div class="toast-body text-white">
+        {{ toast.message }}
+      </div>
+    </div>
+  }
+</div>
 
 @if (loadingAuth()) {
   <!-- Splash Screen shown during authentication loading state -->
