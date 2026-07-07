@@ -30,7 +30,8 @@ import {
   Firestore,
   serverTimestamp,
   deleteDoc,
-  arrayRemove
+  arrayRemove,
+  arrayUnion
 } from 'firebase/firestore';
 
 /* ================= MODELS ================= */
@@ -75,9 +76,23 @@ export interface Message {
   receiverId: string;
   content: string;
   timestamp: any;
-  mediaType?: 'image' | 'video' | 'text' | 'document';
+  mediaType?: 'image' | 'video' | 'text' | 'document' | 'audio';
   mediaData?: string; // base64 payload
   read?: boolean; // unread count tracking for DMs
+}
+
+export interface VoiceCall {
+  id: string; // matches chatId or groupId
+  type: 'direct' | 'group';
+  callerId: string;
+  callerName: string;
+  receiverId: string; // friend uid or group id
+  status: 'calling' | 'active' | 'ended';
+  participants: string[];
+  speakers?: string[]; // uids of users currently speaking
+  timestamp: number;
+  offer?: any;
+  answer?: any;
 }
 
 const MOCK_FRIENDS: UserProfile[] = [
@@ -136,6 +151,8 @@ export class FirebaseService {
   private _groups$ = new BehaviorSubject<ChatGroup[]>([]);
   private _invitations$ = new BehaviorSubject<Invitation[]>([]);
   private _authLoaded$ = new BehaviorSubject<boolean>(false);
+  private _activeCall$ = new BehaviorSubject<VoiceCall | null>(null);
+  private _incomingCall$ = new BehaviorSubject<VoiceCall | null>(null);
 
   readonly currentUser$ = this._currentUser$.asObservable();
   readonly users$ = this._users$.asObservable();
@@ -143,8 +160,18 @@ export class FirebaseService {
   readonly groups$ = this._groups$.asObservable();
   readonly invitations$ = this._invitations$.asObservable();
   readonly authLoaded$ = this._authLoaded$.asObservable();
+  readonly activeCall$ = this._activeCall$.asObservable();
+  readonly incomingCall$ = this._incomingCall$.asObservable();
+
+  private callChannel: BroadcastChannel | null = null;
 
   constructor() {
+    if (typeof window !== 'undefined') {
+      this.callChannel = new BroadcastChannel('whatsapp_voice_calls');
+      this.callChannel.onmessage = (event) => {
+        this.handleCallBroadcast(event.data);
+      };
+    }
     this.boot();
   }
 
@@ -175,6 +202,57 @@ export class FirebaseService {
       console.error('Firebase failed → mock mode', e);
       this.isMockMode = true;
       this.bootMock();
+    }
+  }
+
+  private handleCallBroadcast(msg: any) {
+    if (!this.isMockMode) return;
+    const me = this._currentUser$.value;
+    if (!me) return;
+
+    switch (msg.type) {
+      case 'call_initiated':
+        if (msg.call.receiverId === me.uid && msg.call.status === 'calling') {
+          this._incomingCall$.next(msg.call);
+          this._activeCall$.next(msg.call);
+        } else if (msg.call.type === 'group' && this.mockGroups.some(g => g.id === msg.call.receiverId)) {
+          this._activeCall$.next(msg.call);
+        }
+        break;
+      case 'call_accepted':
+        if (this._activeCall$.value && this._activeCall$.value.id === msg.callId) {
+          const updated = {
+            ...this._activeCall$.value,
+            status: 'active' as const,
+            participants: msg.participants
+          };
+          this._activeCall$.next(updated);
+          if (this._incomingCall$.value?.id === msg.callId) {
+            this._incomingCall$.next(null);
+          }
+        }
+        break;
+      case 'call_rejected':
+      case 'call_ended':
+        if (this._activeCall$.value && this._activeCall$.value.id === msg.callId) {
+          this._activeCall$.next(null);
+          this._incomingCall$.next(null);
+        }
+        break;
+      case 'call_signaling':
+        if (this._activeCall$.value && this._activeCall$.value.id === msg.callId) {
+          const event = new CustomEvent('whatsapp_call_signal', { detail: msg });
+          window.dispatchEvent(event);
+        }
+        break;
+      case 'call_speakers_changed':
+        if (this._activeCall$.value && this._activeCall$.value.id === msg.callId) {
+          this._activeCall$.next({
+            ...this._activeCall$.value,
+            speakers: msg.speakers
+          });
+        }
+        break;
     }
   }
 
@@ -248,6 +326,7 @@ export class FirebaseService {
         this.listenMessagesFirebase();
         this.listenGroupsFirebase();
         this.listenInvitationsFirebase();
+        this.listenCallsFirebase();
       } catch (err) {
         console.warn('Firebase initialization failed on boot, falling back to mock mode:', err);
         localStorage.setItem('abhi_forced_mock', 'true');
@@ -577,7 +656,7 @@ export class FirebaseService {
 
   /* ================= SEND MESSAGE ================= */
 
-  async sendMessage(receiverId: string, content: string, mediaType: 'text' | 'image' | 'video' | 'document' = 'text', mediaData?: string) {
+  async sendMessage(receiverId: string, content: string, mediaType: 'text' | 'image' | 'video' | 'document' | 'audio' = 'text', mediaData?: string) {
     const me = this._currentUser$.value;
     if (!me) return;
 
@@ -1001,6 +1080,185 @@ export class FirebaseService {
       } catch (err) {
         console.error('Failed to delete friend connection', err);
       }
+    }
+  }
+
+  private listenCallsFirebase() {
+    if (!this.db) return;
+    const me = this._currentUser$.value;
+    if (!me) return;
+
+    onSnapshot(collection(this.db, 'calls'), (snap) => {
+      let active: VoiceCall | null = null;
+      let incoming: VoiceCall | null = null;
+
+      snap.docs.forEach(docSnap => {
+        const call = docSnap.data() as VoiceCall;
+        if (call.status === 'ended') return;
+
+        if (call.receiverId === me.uid && call.status === 'calling') {
+          incoming = call;
+          active = call;
+        } else if (call.callerId === me.uid || call.receiverId === me.uid || call.participants.includes(me.uid)) {
+          active = call;
+        } else if (call.type === 'group' && this._groups$.value.some(g => g.id === call.receiverId)) {
+          active = call;
+        }
+      });
+
+      this._incomingCall$.next(incoming);
+      this._activeCall$.next(active);
+    });
+  }
+
+  async initiateCall(chatId: string, type: 'direct' | 'group'): Promise<string> {
+    const me = this._currentUser$.value;
+    if (!me) throw new Error('Not logged in.');
+
+    const callId = chatId;
+    const call: VoiceCall = {
+      id: callId,
+      type,
+      callerId: me.uid,
+      callerName: me.displayName,
+      receiverId: chatId,
+      status: type === 'group' ? 'active' : 'calling',
+      participants: [me.uid],
+      speakers: [],
+      timestamp: Date.now()
+    };
+
+    if (this.isMockMode) {
+      this._activeCall$.next(call);
+      this.callChannel?.postMessage({ type: 'call_initiated', call });
+    } else if (this.db) {
+      await setDoc(doc(this.db, 'calls', callId), call);
+    }
+    return callId;
+  }
+
+  async acceptCall(callId: string): Promise<void> {
+    const me = this._currentUser$.value;
+    if (!me) return;
+
+    if (this.isMockMode) {
+      const active = this._activeCall$.value;
+      if (active && active.id === callId) {
+        const participants = Array.from(new Set([...active.participants, me.uid]));
+        const updated = { ...active, status: 'active' as const, participants };
+        this._activeCall$.next(updated);
+        this._incomingCall$.next(null);
+        this.callChannel?.postMessage({ type: 'call_accepted', callId, participants });
+      }
+    } else if (this.db) {
+      const callRef = doc(this.db, 'calls', callId);
+      await updateDoc(callRef, {
+        status: 'active',
+        participants: arrayUnion(me.uid)
+      });
+    }
+  }
+
+  async rejectCall(callId: string): Promise<void> {
+    if (this.isMockMode) {
+      this._activeCall$.next(null);
+      this._incomingCall$.next(null);
+      this.callChannel?.postMessage({ type: 'call_rejected', callId });
+    } else if (this.db) {
+      const callRef = doc(this.db, 'calls', callId);
+      await updateDoc(callRef, { status: 'ended' });
+    }
+  }
+
+  async endCall(callId: string): Promise<void> {
+    if (this.isMockMode) {
+      this._activeCall$.next(null);
+      this._incomingCall$.next(null);
+      this.callChannel?.postMessage({ type: 'call_ended', callId });
+    } else if (this.db) {
+      const callRef = doc(this.db, 'calls', callId);
+      await updateDoc(callRef, { status: 'ended' });
+    }
+  }
+
+  async updateSpeakerStatus(callId: string, isSpeaking: boolean): Promise<void> {
+    const me = this._currentUser$.value;
+    if (!me) return;
+
+    if (this.isMockMode) {
+      const active = this._activeCall$.value;
+      if (active && active.id === callId) {
+        let speakers = active.speakers || [];
+        if (isSpeaking) {
+          speakers = Array.from(new Set([...speakers, me.uid]));
+        } else {
+          speakers = speakers.filter(uid => uid !== me.uid);
+        }
+        const updated = { ...active, speakers };
+        this._activeCall$.next(updated);
+        this.callChannel?.postMessage({ type: 'call_speakers_changed', callId, speakers });
+      }
+    } else if (this.db) {
+      const callRef = doc(this.db, 'calls', callId);
+      if (isSpeaking) {
+        await updateDoc(callRef, { speakers: arrayUnion(me.uid) });
+      } else {
+        await updateDoc(callRef, { speakers: arrayRemove(me.uid) });
+      }
+    }
+  }
+
+  async sendCallSignal(callId: string, signalData: any): Promise<void> {
+    if (this.isMockMode) {
+      this.callChannel?.postMessage({
+        type: 'call_signaling',
+        callId,
+        signal: signalData
+      });
+    } else if (this.db) {
+      const me = this._currentUser$.value;
+      if (!me) return;
+      await addDoc(collection(this.db, 'calls', callId, 'signals'), {
+        ...signalData,
+        senderId: me.uid,
+        timestamp: Date.now()
+      });
+    }
+  }
+
+  listenCallSignals(callId: string): Observable<any> {
+    if (this.isMockMode) {
+      return new Observable(subscriber => {
+        const handler = (e: Event) => {
+          const customEvent = e as CustomEvent;
+          if (customEvent.detail.callId === callId) {
+            subscriber.next(customEvent.detail.signal);
+          }
+        };
+        window.addEventListener('whatsapp_call_signal', handler);
+        return () => window.removeEventListener('whatsapp_call_signal', handler);
+      });
+    } else {
+      return new Observable(subscriber => {
+        if (!this.db) {
+          subscriber.complete();
+          return;
+        }
+        const q = query(
+          collection(this.db, 'calls', callId, 'signals'),
+          orderBy('timestamp', 'asc')
+        );
+        return onSnapshot(q, (snap) => {
+          snap.docChanges().forEach((change) => {
+            if (change.type === 'added') {
+              const data = change.doc.data();
+              if (data['senderId'] !== this._currentUser$.value?.uid) {
+                subscriber.next(data);
+              }
+            }
+          });
+        });
+      });
     }
   }
 }

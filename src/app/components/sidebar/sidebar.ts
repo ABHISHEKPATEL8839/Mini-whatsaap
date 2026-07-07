@@ -21,6 +21,8 @@ export class SidebarComponent implements OnInit, OnDestroy {
   newBio = signal('');
   editingBio = signal(false);
   newName = signal('');
+  loading = signal(false);
+  inviteLoading = signal(false);
   editingName = signal(false);
   showCreateGroup = signal(false);
   newGroupName = signal('');
@@ -34,7 +36,6 @@ export class SidebarComponent implements OnInit, OnDestroy {
   inviteEmail = signal('');
   inviteError = signal('');
   inviteSuccess = signal('');
-  inviteLoading = signal(false);
 
   allUsers = signal<UserProfile[]>([]);
   groups = signal<ChatGroup[]>([]);
@@ -93,25 +94,39 @@ export class SidebarComponent implements OnInit, OnDestroy {
     })
   }
 
-  ngOnInit() {
-    this.subs.push(
-      this.firebaseService.users$.subscribe((list: UserProfile[]) => {
-        this.allUsers.set(list);
-      })
-    );
+ngOnInit() {
+  this.loading.set(true);
 
-    this.subs.push(
-      this.firebaseService.groups$.subscribe((list: ChatGroup[]) => {
-        this.groups.set(list);
-      })
-    );
+  let loaded = 0;
 
-    this.subs.push(
-      this.firebaseService.invitations$.subscribe((list: Invitation[]) => {
-        this.invitations.set(list);
-      })
-    );
-  }
+  const checkLoaded = () => {
+    loaded++;
+    if (loaded === 3) {
+      this.loading.set(false);
+    }
+  };
+
+  this.subs.push(
+    this.firebaseService.users$.subscribe(users => {
+      this.allUsers.set(users);
+      checkLoaded();
+    })
+  );
+
+  this.subs.push(
+    this.firebaseService.groups$.subscribe(groups => {
+      this.groups.set(groups);
+      checkLoaded();
+    })
+  );
+
+  this.subs.push(
+    this.firebaseService.invitations$.subscribe(invites => {
+      this.invitations.set(invites);
+      checkLoaded();
+    })
+  );
+}
 
   ngOnDestroy() {
     this.subs.forEach(s => s.unsubscribe());
@@ -144,17 +159,37 @@ export class SidebarComponent implements OnInit, OnDestroy {
     }
   }
 
-  async acceptInvite(id: string) {
+ async acceptInvite(id: string) {
+  this.loading.set(true);
+
+  try {
     await this.firebaseService.acceptInvitation(id);
+  } finally {
+    this.loading.set(false);
   }
+}
 
-  async rejectInvite(id: string) {
+async rejectInvite(id: string) {
+  this.loading.set(true);
+
+  try {
     await this.firebaseService.rejectInvitation(id);
+  } finally {
+    this.loading.set(false);
   }
+}
 
-  async deleteInvite(id: string) {
+async deleteInvite(id: string) {
+  this.loading.set(true);
+
+  try {
     await this.firebaseService.deleteInvitation(id);
+  } finally {
+    this.loading.set(false);
   }
+}
+
+
 
   toggleEditBio() {
     if (this.editingBio()) {
@@ -165,14 +200,22 @@ export class SidebarComponent implements OnInit, OnDestroy {
     }
   }
 
-  async saveBio() {
+ async saveBio() {
+  this.loading.set(true);
+
+  try {
     const bioText = this.newBio().trim();
+
     await this.firebaseService.updateProfileData(
       this.currentUser?.displayName || '',
       bioText
     );
+
     this.editingBio.set(false);
+  } finally {
+    this.loading.set(false);
   }
+}
 
   toggleEditName() {
     if (this.editingName()) {
@@ -183,16 +226,23 @@ export class SidebarComponent implements OnInit, OnDestroy {
     }
   }
 
-  async saveName() {
-    const clean = this.newName().trim();
-    if (clean.length >= 2) {
-      await this.firebaseService.updateProfileData(
-        clean,
-        this.currentUser?.bio || ''
-      );
-    }
+ async saveName() {
+  const clean = this.newName().trim();
+  if (clean.length < 2) return;
+
+  this.loading.set(true);
+
+  try {
+    await this.firebaseService.updateProfileData(
+      clean,
+      this.currentUser?.bio || ''
+    );
+
     this.editingName.set(false);
+  } finally {
+    this.loading.set(false);
   }
+}
 
 
 
@@ -206,35 +256,57 @@ export class SidebarComponent implements OnInit, OnDestroy {
     );
   }
 
-  async createGroup() {
-    const name = this.newGroupName().trim();
-    if (name) {
-      const members = [...this.selectedGroupMembers(), this.currentUser?.uid].filter(Boolean) as string[];
-      const avatar = this.newGroupAvatar();
-      await this.firebaseService.createGroup(name, members, avatar);
-      this.newGroupName.set('');
-      this.newGroupAvatar.set('');
-      this.selectedGroupMembers.set([]);
-      this.showCreateGroup.set(false);
-    }
+async createGroup() {
+  const name = this.newGroupName().trim();
+  if (!name) return;
+
+  this.loading.set(true);
+
+  try {
+    const members = [
+      ...this.selectedGroupMembers(),
+      this.currentUser?.uid
+    ].filter(Boolean) as string[];
+
+    const avatar = this.newGroupAvatar();
+
+    await this.firebaseService.createGroup(
+      name,
+      members,
+      avatar
+    );
+
+    this.newGroupName.set('');
+    this.newGroupAvatar.set('');
+    this.selectedGroupMembers.set([]);
+    this.showCreateGroup.set(false);
+  } finally {
+    this.loading.set(false);
   }
+}
 
   onProfilePicSelected(event: any) {
     const file = event.target.files?.[0];
     if (!file) return;
 
     const reader = new FileReader();
-    reader.onload = async () => {
-      const base64 = reader.result as string;
-      console.log(base64, "base64")
-      if (this.currentUser) {
-        await this.firebaseService.updateProfileData(
-          this.currentUser.displayName,
-          this.currentUser.bio || '',
-          base64
-        );
-      }
-    };
+  reader.onload = async () => {
+  const base64 = reader.result as string;
+
+  if (!this.currentUser) return;
+
+  this.loading.set(true);
+
+  try {
+    await this.firebaseService.updateProfileData(
+      this.currentUser.displayName,
+      this.currentUser.bio || '',
+      base64
+    );
+  } finally {
+    this.loading.set(false);
+  }
+};;
     reader.readAsDataURL(file);
   }
 

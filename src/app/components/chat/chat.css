@@ -700,3 +700,455 @@
   margin: 0 !important;
   cursor: pointer;
 }
+.chat-loading {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  flex-direction: column;
+  height: 100%;
+  background: #0c1317;
+}
+
+/* ================= VOICE RECORDING DRAWER ================= */
+.message-input-area.recording {
+  background: rgba(17, 27, 33, 0.95) !important;
+  border-top: 1px solid var(--accent-emerald);
+  padding: 10px 24px;
+}
+
+.recording-drawer-active {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+}
+
+.discard-recording-btn {
+  background: transparent !important;
+  color: #ef4444 !important;
+  transition: all 0.2s ease;
+}
+.discard-recording-btn:hover {
+  background: rgba(239, 68, 68, 0.1) !important;
+  transform: scale(1.1);
+}
+
+.recording-indicator-wrap {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 12px;
+  padding: 8px 16px;
+  border: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.pulse-red-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background-color: #ef4444;
+  animation: pulseLive 1.5s infinite;
+}
+
+.recording-timer {
+  color: #e9edef;
+  font-size: 0.95rem;
+  margin-right: 12px;
+}
+
+.recording-wave-canvas {
+  background: transparent;
+  flex: 1;
+  max-width: 250px;
+}
+
+.send-recording-btn {
+  width: 44px;
+  height: 44px;
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.25);
+  transition: all 0.2s ease;
+}
+.send-recording-btn:hover {
+  transform: scale(1.1);
+}
+
+/* ================= CUSTOM AUDIO MESSAGE PLAYERS ================= */
+.msg-audio-wrap {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  background: rgba(0, 0, 0, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 12px;
+  padding: 10px 14px;
+  min-width: 260px;
+  max-width: 320px;
+}
+
+.audio-play-btn {
+  background: var(--accent-emerald) !important;
+  color: #fff !important;
+  border: none;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+  box-shadow: 0 3px 8px rgba(16, 185, 129, 0.3);
+}
+
+.audio-play-btn:hover {
+  transform: scale(1.08);
+  background: var(--accent-emerald-dark) !important;
+}
+
+.audio-progress-wrap {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.audio-waveform-bars {
+  position: relative;
+  height: 6px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.waveform-progress-bar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  background: var(--accent-emerald);
+  border-radius: 3px;
+  transition: width 0.1s linear;
+}
+
+.audio-duration {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  font-family: monospace;
+}
+
+.audio-mic-badge {
+  color: var(--accent-emerald);
+  font-size: 1.1rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+/* ================= FULLSCREEN CALL OVERLAYS ================= */
+.call-overlay-fullscreen {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100dvh;
+  z-index: 9999;
+  background: radial-gradient(circle at center, rgba(15, 23, 42, 0.85) 0%, rgba(8, 12, 24, 0.96) 100%);
+  backdrop-filter: blur(16px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.call-modal-card {
+  width: 90%;
+  max-width: 420px;
+  padding: 40px 30px;
+  border-radius: 24px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(30, 41, 59, 0.25) !important;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6);
+  position: relative;
+}
+
+.caller-avatar-pulse-wrap {
+  position: relative;
+  width: 120px;
+  height: 120px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.caller-avatar {
+  width: 100px;
+  height: 100px;
+  border-radius: 50%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  font-size: 2.2rem;
+  font-weight: 700;
+  color: #fff;
+  border: 3px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.3);
+  text-transform: uppercase;
+  z-index: 3;
+}
+
+.pulse-ring {
+  position: absolute;
+  width: 100px;
+  height: 100px;
+  border-radius: 50%;
+  background: rgba(16, 185, 129, 0.15);
+  animation: pulseRingGlow 2.2s cubic-bezier(0.215, 0.61, 0.355, 1) infinite;
+  z-index: 1;
+}
+
+.ring-2 {
+  animation-delay: 0.7s;
+}
+
+@keyframes pulseRingGlow {
+  0% {
+    transform: scale(0.95);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1.8);
+    opacity: 0;
+  }
+}
+
+.caller-name {
+  font-family: var(--font-display);
+  font-size: 1.6rem;
+  font-weight: 600;
+  color: #fff;
+}
+
+.call-status {
+  font-size: 0.9rem;
+  font-weight: 500;
+  letter-spacing: 0.5px;
+}
+
+.call-visualizer-canvas {
+  margin-top: 15px;
+  background: transparent;
+  width: 220px;
+  height: 220px;
+}
+
+.call-actions-row {
+  display: flex;
+  gap: 40px;
+  justify-content: center;
+}
+
+.btn-accept-call,
+.btn-decline-call {
+  width: 58px;
+  height: 58px;
+  border-radius: 50%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  border: none;
+  font-size: 1.4rem;
+  cursor: pointer;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.3);
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.btn-accept-call {
+  background: #10b981;
+  animation: ringShake 0.5s infinite alternate;
+}
+.btn-accept-call:hover {
+  transform: scale(1.12);
+  box-shadow: 0 8px 24px rgba(16, 185, 129, 0.5);
+}
+
+.btn-decline-call {
+  background: #ef4444;
+}
+.btn-decline-call:hover {
+  transform: scale(1.12);
+  box-shadow: 0 8px 24px rgba(239, 68, 68, 0.5);
+}
+
+@keyframes ringShake {
+  0% { transform: rotate(-8deg) scale(1); }
+  100% { transform: rotate(8deg) scale(1.04); }
+}
+
+/* Call Control Buttons */
+.call-controls-bar {
+  display: flex;
+  gap: 20px;
+  justify-content: center;
+}
+
+.control-circle-btn {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: #fff;
+  font-size: 1.15rem;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+.control-circle-btn:hover {
+  background: rgba(255, 255, 255, 0.18);
+  transform: scale(1.08);
+}
+.control-circle-btn.muted {
+  background: #f59e0b;
+  border-color: #f59e0b;
+}
+.control-circle-btn.speaker-off {
+  background: rgba(255,255,255,0.02);
+  color: rgba(255,255,255,0.4);
+}
+.control-circle-btn.hangup {
+  background: #ef4444;
+  border-color: #ef4444;
+  transform: rotate(135deg);
+}
+.control-circle-btn.hangup:hover {
+  background: #dc2626;
+  box-shadow: 0 4px 15px rgba(239, 68, 68, 0.4);
+}
+
+/* ================= GROUP VOICE CALL BANNER & INTERFACE ================= */
+.group-call-active-banner {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 24px;
+  background: linear-gradient(90deg, rgba(16, 185, 129, 0.15) 0%, rgba(59, 130, 246, 0.05) 100%);
+  border-bottom: 1px solid rgba(16, 185, 129, 0.25);
+  animation: fadeIn 0.3s ease;
+}
+
+.live-pulse-ring {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #10b981;
+  animation: pulseLive 1.8s infinite;
+}
+
+/* Floating Group Call Interface */
+.group-voice-overlay {
+  position: absolute;
+  top: 75px;
+  right: 24px;
+  z-index: 100;
+  width: 320px;
+  animation: slideUp 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.group-voice-card {
+  padding: 18px 20px;
+  border-radius: 16px;
+  background: rgba(30, 41, 59, 0.85) !important;
+  backdrop-filter: blur(14px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.4);
+}
+
+.participants-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  max-height: 180px;
+  overflow-y: auto;
+}
+
+.participant-call-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.participant-call-avatar {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  color: #fff;
+  font-weight: 600;
+  font-size: 1rem;
+  border: 2px solid rgba(255, 255, 255, 0.08);
+  text-transform: uppercase;
+  transition: all 0.25s ease;
+}
+
+.participant-call-avatar.speaking {
+  border-color: #10b981;
+  box-shadow: 0 0 10px rgba(16, 185, 129, 0.5);
+  animation: speakerPulse 1.2s infinite;
+}
+
+@keyframes speakerPulse {
+  0%, 100% { box-shadow: 0 0 4px rgba(16, 185, 129, 0.4); }
+  50% { box-shadow: 0 0 12px rgba(16, 185, 129, 0.7); }
+}
+
+.speaking-wave-dot {
+  position: absolute;
+  bottom: -2px;
+  right: -2px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #10b981;
+  border: 2px solid rgba(30, 41, 59, 0.9);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.speaking-wave-dot::after {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #fff;
+}
+
+.call-controls-inline {
+  display: flex;
+  gap: 15px;
+}
+.control-circle-btn.btn-sm {
+  width: 36px;
+  height: 36px;
+  font-size: 0.95rem;
+}
+
+.voice-call-input-btn {
+  opacity: 0.6;
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+.voice-call-input-btn:hover {
+  opacity: 1;
+  transform: scale(1.1);
+  background: transparent !important;
+}

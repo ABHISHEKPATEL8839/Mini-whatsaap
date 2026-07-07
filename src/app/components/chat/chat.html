@@ -1,3 +1,15 @@
+@if (isChatLoading()) {
+
+<div class="chat-loading">
+  <div class="spinner-border text-success" role="status"></div>
+  <p class="mt-3 text-secondary">Loading chat...</p>
+</div>
+
+} @else {
+
+
+
+
 <div class="chat-window">
 
   @if (!chatId || chatId === '') {
@@ -54,10 +66,10 @@
     </div>
 
     <div class="chat-header-actions position-relative">
-      <button class="header-action-btn" title="Voice Call"><i class="bi bi-telephone"></i></button>
-      <button class="header-action-btn" title="Video Call"><i class="bi bi-camera-video"></i></button>
+      <button class="header-action-btn" (click)="startVoiceCall()" title="Voice Call" type="button"><i class="bi bi-telephone"></i></button>
+      <button class="header-action-btn" title="Video Call" type="button"><i class="bi bi-camera-video"></i></button>
       <button class="header-action-btn" [class.active]="showOptionsMenu()" (click)="toggleOptionsMenu()"
-        title="More Options">
+        title="More Options" type="button">
         <i class="bi bi-three-dots-vertical"></i>
       </button>
 
@@ -152,6 +164,19 @@
     </p>
   </div>
   } @else {
+  <!-- Group Call Active Banner -->
+  @if (activeCall() && activeCall()!.type === 'group' && currentUser && !activeCall()!.participants.includes(currentUser.uid)) {
+  <div class="group-call-active-banner animate-slide-up">
+    <div class="d-flex align-items-center gap-3">
+      <div class="live-pulse-ring"></div>
+      <span class="small text-white font-monospace">Voice chat started in group ({{ activeCall()!.participants.length }} joined)</span>
+    </div>
+    <button class="btn btn-success btn-sm px-3 fw-bold" (click)="joinGroupVoiceCall(activeCall()!.id)" type="button">
+      <i class="bi bi-telephone-fill me-1"></i> Join Voice Chat
+    </button>
+  </div>
+  }
+
   <!-- Messages List -->
   <div class="messages-container" #messageContainer>
     @if (messages().length === 0) {
@@ -210,9 +235,31 @@
               </a>
             </div>
           </div>
+          } @else if (msg.mediaType === 'audio') {
+          <div class="msg-audio-wrap">
+            <button class="audio-play-btn" (click)="toggleAudioPlayback(msg.id, msg.mediaData!)" type="button">
+              @if (audioPlaybackStates()[msg.id]?.playing) {
+              <i class="bi bi-pause-fill"></i>
+              } @else {
+              <i class="bi bi-play-fill"></i>
+              }
+            </button>
+            <div class="audio-progress-wrap">
+              <div class="audio-waveform-bars">
+                <div class="waveform-progress-bar" [style.width.%]="audioPlaybackStates()[msg.id]?.progress || 0"></div>
+                <div class="waveform-bars-bg"></div>
+              </div>
+              <div class="audio-duration">
+                {{ formatDuration(audioPlaybackStates()[msg.id]?.currentTime || 0) }} / {{ formatDuration(audioPlaybackStates()[msg.id]?.duration || 0) }}
+              </div>
+            </div>
+            <div class="audio-mic-badge">
+              <i class="bi bi-mic-fill"></i>
+            </div>
+          </div>
           }
 
-          @if (msg.content && msg.mediaType !== 'document') {
+          @if (msg.content && msg.mediaType !== 'document' && msg.mediaType !== 'audio') {
           <p class="message-text">{{ msg.content }}</p>
           }
 
@@ -276,34 +323,60 @@
   }
 
   <!-- Bottom Message Text Area & toolbar -->
-  <div class="message-input-area">
-    <input type="file" #fileInput (change)="onFileSelected($event)" style="display: none;"
-      accept="image/*,video/*,.pdf,.doc,.docx,.txt,.zip" />
+  <div class="message-input-area" [class.recording]="isRecording()">
+    @if (isRecording()) {
+      <div class="recording-drawer-active w-100 d-flex align-items-center justify-content-between">
+        <button class="btn btn-outline-danger border-0 rounded-circle discard-recording-btn" (click)="stopRecording(false)" title="Discard Recording" type="button">
+          <i class="bi bi-trash-fill fs-5"></i>
+        </button>
+        
+        <div class="recording-indicator-wrap d-flex align-items-center gap-2">
+          <div class="pulse-red-dot"></div>
+          <span class="recording-timer fw-bold">{{ formatDuration(recordingDuration()) }}</span>
+          <canvas #recordCanvas class="recording-wave-canvas" width="160" height="28"></canvas>
+        </div>
 
-    <div class="input-toolbar">
-      <button class="toolbar-btn" (click)="triggerFileSelect()" title="Attach Image/Video">
-        <i class="bi bi-paperclip"></i>
-      </button>
-      <button class="toolbar-btn" [class.active]="showEmojiPicker()" (click)="toggleEmojiPicker()" title="Emoji Picker">
-        <i class="bi bi-emoji-smile"></i>
-      </button>
-    </div>
+        <button class="btn btn-success rounded-circle send-recording-btn d-flex align-items-center justify-content-center" (click)="stopRecording(true)" title="Send Recording" type="button">
+          <i class="bi bi-check-lg text-white"></i>
+        </button>
+      </div>
+    } @else {
+      <input type="file" #fileInput (change)="onFileSelected($event)" style="display: none;"
+        accept="image/*,video/*,.pdf,.doc,.docx,.txt,.zip" />
 
-    <div class="input-field-wrapper">
-      <textarea id="message-input" class="message-textarea" placeholder="Type a message..." [ngModel]="messageText()"
-        (ngModelChange)="messageText.set($event)" (keydown)="onKeyDown($event)" rows="1"
-        [disabled]="isSending()"></textarea>
-    </div>
+      <div class="input-toolbar">
+        <button class="toolbar-btn" (click)="triggerFileSelect()" title="Attach Image/Video" type="button">
+          <i class="bi bi-paperclip"></i>
+        </button>
+        <button class="toolbar-btn" [class.active]="showEmojiPicker()" (click)="toggleEmojiPicker()" title="Emoji Picker" type="button">
+          <i class="bi bi-emoji-smile"></i>
+        </button>
+      </div>
 
-    <button class="send-btn" [class.active]="messageText().trim() || selectedFileBase64()"
-      [disabled]="(!messageText().trim() && !selectedFileBase64()) || isSending()" (click)="sendMessage()"
-      id="send-button" title="Send Message">
-      @if (isSending()) {
-      <span class="send-spinner"></span>
+      <div class="input-field-wrapper">
+        <textarea id="message-input" class="message-textarea" placeholder="Type a message..." [ngModel]="messageText()"
+          (ngModelChange)="messageText.set($event)" (keydown)="onKeyDown($event)" rows="1"
+          [disabled]="isSending()"></textarea>
+        <!-- Online Voice Chat Trigger Button -->
+        <button class="toolbar-btn voice-call-input-btn me-2" (click)="startVoiceCall()" title="Start Online Voice Chat" type="button">
+          <i class="bi bi-telephone-fill text-success"></i>
+        </button>
+      </div>
+
+      @if (messageText().trim() || selectedFileBase64()) {
+        <button class="send-btn active" [disabled]="isSending()" (click)="sendMessage()" id="send-button" title="Send Message" type="button">
+          @if (isSending()) {
+          <span class="send-spinner"></span>
+          } @else {
+          <span class="send-icon"><i class="bi bi-send-fill text-white"></i></span>
+          }
+        </button>
       } @else {
-      <span class="send-icon"><i class="bi bi-send-fill text-white"></i></span>
+        <button class="send-btn" (click)="startRecording()" id="mic-button" title="Record Voice Message" type="button">
+          <span class="send-icon"><i class="bi bi-mic-fill text-white"></i></span>
+        </button>
       }
-    </button>
+    }
   </div>
   }
   }
@@ -369,5 +442,117 @@
       </div>
     </div>
   </div>
+
+  <!-- Incoming Call Overlay -->
+  @if (incomingCall()) {
+  <div class="call-overlay-fullscreen animate-fade-in">
+    <div class="call-modal-card glassmorphic shadow-premium">
+      <div class="caller-avatar-pulse-wrap">
+        <div class="caller-avatar" [style.background-color]="getUserColor(incomingCall()!.callerId)">
+          {{ getUserInitials(incomingCall()!.callerName) }}
+        </div>
+        <div class="pulse-ring ring-1"></div>
+        <div class="pulse-ring ring-2"></div>
+      </div>
+      <h3 class="caller-name mt-4">{{ incomingCall()!.callerName }}</h3>
+      <p class="call-status text-secondary">Incoming WhatsApp Voice Call...</p>
+      
+      <div class="call-actions-row mt-5">
+        <button class="btn-decline-call" (click)="rejectVoiceCall()" title="Decline" type="button">
+          <i class="bi bi-telephone-x-fill text-white"></i>
+        </button>
+        <button class="btn-accept-call" (click)="acceptVoiceCall()" title="Accept" type="button">
+          <i class="bi bi-telephone-fill text-white"></i>
+        </button>
+      </div>
+    </div>
+  </div>
+  }
+
+  <!-- Outgoing Call / Active 1-on-1 Call Overlay -->
+  @if (activeCall() && activeCall()!.type === 'direct' && !incomingCall()) {
+  <div class="call-overlay-fullscreen animate-fade-in">
+    <div class="call-modal-card glassmorphic shadow-premium">
+      <div class="caller-avatar-pulse-wrap">
+        <div class="caller-avatar" [style.background-color]="getUserColor(chatPartner?.uid || '')">
+          {{ getUserInitials(chatPartner?.displayName || 'Friend') }}
+        </div>
+        @if (activeCall()!.status === 'calling') {
+          <div class="pulse-ring ring-1"></div>
+          <div class="pulse-ring ring-2"></div>
+        }
+      </div>
+      <h3 class="caller-name mt-4">{{ chatPartner?.displayName || 'Friend' }}</h3>
+      <p class="call-status" [class.text-success]="activeCall()!.status === 'active'" [class.text-secondary]="activeCall()!.status === 'calling'">
+        @if (activeCall()!.status === 'calling') {
+          Ringing...
+        } @else {
+          🟢 Connected ({{ formatDuration(callDuration()) }})
+        }
+      </p>
+
+      <canvas #callCanvas class="call-visualizer-canvas" width="220" height="220"></canvas>
+      
+      <div class="call-controls-bar mt-4">
+        <button class="control-circle-btn" [class.muted]="callMuted()" (click)="toggleMute()" title="Mute/Unmute" type="button">
+          <i class="bi" [class.bi-mic-mute-fill]="callMuted()" [class.bi-mic-fill]="!callMuted()"></i>
+        </button>
+        <button class="control-circle-btn" [class.speaker-off]="!speakerEnabled()" (click)="toggleSpeaker()" title="Speaker" type="button">
+          <i class="bi" [class.bi-volume-up-fill]="speakerEnabled()" [class.bi-volume-mute-fill]="!speakerEnabled()"></i>
+        </button>
+        <button class="control-circle-btn hangup" (click)="endVoiceCall()" title="End Call" type="button">
+          <i class="bi bi-telephone-fill"></i>
+        </button>
+      </div>
+    </div>
+  </div>
+  }
+
+  <!-- Active Group Call / Voice Room Card -->
+  @if (activeCall() && activeCall()!.type === 'group' && currentUser && activeCall()!.participants.includes(currentUser.uid)) {
+  <div class="group-voice-overlay animate-fade-in">
+    <div class="group-voice-card glassmorphic shadow-premium">
+      <div class="d-flex justify-content-between align-items-center border-bottom border-secondary border-opacity-10 pb-3 mb-3">
+        <div>
+          <h5 class="fw-bold mb-1"><i class="bi bi-people-fill text-success me-2"></i>Voice Chat Active</h5>
+          <span class="small text-secondary">{{ formatDuration(callDuration()) }}</span>
+        </div>
+        <button class="btn btn-danger btn-sm px-3 fw-bold" (click)="endVoiceCall()" type="button">
+          Leave Chat
+        </button>
+      </div>
+
+      <div class="participants-grid py-2">
+        @for (uid of activeCall()!.participants; track uid) {
+          <div class="participant-call-cell d-flex flex-column align-items-center gap-2">
+            <div class="participant-call-avatar position-relative" 
+                 [class.speaking]="activeCall()!.speakers?.includes(uid)"
+                 [style.background-color]="getUserColor(uid)">
+              {{ getUserInitials(users().find(u => u.uid === uid)?.displayName || 'User') }}
+              @if (activeCall()!.speakers?.includes(uid)) {
+                <span class="speaking-wave-dot"></span>
+              }
+            </div>
+            <span class="participant-call-name text-center small text-white text-truncate" style="max-width: 76px;">
+              {{ uid === currentUser.uid ? 'You' : (users().find(u => u.uid === uid)?.displayName || 'User') }}
+            </span>
+          </div>
+        }
+      </div>
+
+      <div class="call-controls-inline mt-3 d-flex justify-content-center gap-3">
+        <button class="control-circle-btn btn-sm" [class.muted]="callMuted()" (click)="toggleMute()" title="Mute/Unmute" type="button">
+          <i class="bi" [class.bi-mic-mute-fill]="callMuted()" [class.bi-mic-fill]="!callMuted()"></i>
+        </button>
+        <button class="control-circle-btn btn-sm" [class.speaker-off]="!speakerEnabled()" (click)="toggleSpeaker()" title="Speaker" type="button">
+          <i class="bi" [class.bi-volume-up-fill]="speakerEnabled()" [class.bi-volume-mute-fill]="!speakerEnabled()"></i>
+        </button>
+      </div>
+    </div>
+  </div>
+  }
   }
 </div>
+
+
+}

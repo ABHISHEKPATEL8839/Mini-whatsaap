@@ -5,7 +5,7 @@ import {
 import { FormsModule } from '@angular/forms';
 import { Subscription } from 'rxjs';
 import { PickerComponent } from '@ctrl/ngx-emoji-mart';
-import { FirebaseService, UserProfile, Message, ChatGroup, Invitation } from '../../services/firebase.service';
+import { FirebaseService, UserProfile, Message, ChatGroup, Invitation, VoiceCall } from '../../services/firebase.service';
 
 @Component({
   selector: 'app-chat',
@@ -40,7 +40,41 @@ export class ChatComponent implements OnInit, OnDestroy, OnChanges, AfterViewChe
   selectedFileBase64 = signal<string | null>(null);
   selectedFileType = signal<'image' | 'video' | 'document' | null>(null);
   selectedFileName = signal<string | null>(null);
+  
+  isChatLoading = signal(false);
 
+  // Voice Recording Signals
+  isRecording = signal(false);
+  recordingDuration = signal(0);
+  private mediaRecorder: MediaRecorder | null = null;
+  private audioChunks: Blob[] = [];
+  private recordingTimerInterval: any = null;
+
+  // Voice Call Signals
+  activeCall = signal<VoiceCall | null>(null);
+  incomingCall = signal<VoiceCall | null>(null);
+  callMuted = signal(false);
+  speakerEnabled = signal(true);
+  callDuration = signal(0);
+  private callDurationInterval: any = null;
+  private peerConnection: RTCPeerConnection | null = null;
+  private localStream: MediaStream | null = null;
+  private callSignalSub: Subscription | null = null;
+  private incomingCallSub: Subscription | null = null;
+  private activeCallSub: Subscription | null = null;
+  private ringtoneAudioContext: AudioContext | null = null;
+
+  // Audio Playback Signals
+  playingAudioId = signal<string | null>(null);
+  audioPlaybackStates = signal<{ [msgId: string]: { playing: boolean, progress: number, currentTime: number, duration: number } }>({});
+  private activeAudios = new Map<string, HTMLAudioElement>();
+
+  // Visualizer Canvases
+  private localAudioContext: AudioContext | null = null;
+  private animationFrameId: number | null = null;
+
+  @ViewChild('recordCanvas') private recordCanvas!: ElementRef<HTMLCanvasElement>;
+  @ViewChild('callCanvas') private callCanvas!: ElementRef<HTMLCanvasElement>;
   // Options dropdown and Group edit modal states
   showOptionsMenu = signal(false);
   isEditingGroup = signal(false);
@@ -219,6 +253,31 @@ export class ChatComponent implements OnInit, OnDestroy, OnChanges, AfterViewChe
     this.invitationsSubscription = this.firebaseService.invitations$.subscribe(list => {
       this.invitations.set(list);
     });
+
+    this.incomingCallSub = this.firebaseService.incomingCall$.subscribe(call => {
+      this.incomingCall.set(call);
+      if (call) {
+        this.playRingtone();
+      } else {
+        this.stopRingtone();
+      }
+    });
+
+    this.activeCallSub = this.firebaseService.activeCall$.subscribe(call => {
+      const prevCall = this.activeCall();
+      this.activeCall.set(call);
+      if (call) {
+        if (call.status === 'active') {
+          this.stopRingtone();
+          this.startCallTimer();
+          if (call.type === 'direct' && !this.peerConnection && prevCall?.status === 'calling') {
+            this.setupWebRTCPeer(call.id, false);
+          }
+        }
+      } else {
+        this.cleanupCall();
+      }
+    });
   }
 
   ngOnChanges(changes: SimpleChanges) {
@@ -228,6 +287,9 @@ export class ChatComponent implements OnInit, OnDestroy, OnChanges, AfterViewChe
       this.clearSelectedFile();
       this.showOptionsMenu.set(false);
       this.isEditingGroup.set(false);
+      if (this.isRecording()) {
+        this.stopRecording(false);
+      }
     }
   }
 
@@ -237,16 +299,29 @@ export class ChatComponent implements OnInit, OnDestroy, OnChanges, AfterViewChe
     }
   }
 
-  private subscribeToMessages() {
-    if (this.msgSubscription) {
-      this.msgSubscription.unsubscribe();
-    }
-
-    this.msgSubscription = this.firebaseService.getMessagesForChat(this.chatId).subscribe(msgs => {
-      this.messages.set(msgs);
-      this.shouldScrollToBottom = true;
-    });
+ private subscribeToMessages() {
+  if (this.msgSubscription) {
+    this.msgSubscription.unsubscribe();
   }
+
+  this.isChatLoading.set(true);
+
+  this.msgSubscription = this.firebaseService
+    .getMessagesForChat(this.chatId)
+    .subscribe({
+      next: (msgs) => {
+        this.messages.set(msgs);
+        this.shouldScrollToBottom = true;
+
+        // Hide spinner after data arrives
+        this.isChatLoading.set(false);
+      },
+      error: (err) => {
+        console.error(err);
+        this.isChatLoading.set(false);
+      }
+    });
+}
 
   ngOnDestroy() {
     if (this.msgSubscription) {
@@ -261,6 +336,16 @@ export class ChatComponent implements OnInit, OnDestroy, OnChanges, AfterViewChe
     if (this.invitationsSubscription) {
       this.invitationsSubscription.unsubscribe();
     }
+    if (this.incomingCallSub) {
+      this.incomingCallSub.unsubscribe();
+    }
+    if (this.activeCallSub) {
+      this.activeCallSub.unsubscribe();
+    }
+    if (this.callSignalSub) {
+      this.callSignalSub.unsubscribe();
+    }
+    this.cleanupCall();
   }
 
   private scrollToBottom() {
@@ -453,11 +538,507 @@ export class ChatComponent implements OnInit, OnDestroy, OnChanges, AfterViewChe
     }
   }
 
+
   addEmojiMart(event: any) {
     const emoji = event.emoji?.native || event.native || event;
     if (emoji) {
       this.messageText.update(text => text + emoji);
     }
     this.showEmojiPicker.set(false);
+  }
+
+
+
+  openChat(chatId: string) {
+  this.isChatLoading.set(true);
+
+  this.chatId = chatId;
+
+  this.firebaseService.getMessagesForChat(chatId).subscribe(messages => {
+    this.messages.set(messages);
+
+    this.isChatLoading.set(false);
+  });
+}
+
+loadChat(chatId: string) {
+  this.isChatLoading.set(true);
+
+  this.chatId = chatId;
+
+  this.msgSubscription?.unsubscribe();
+
+  this.msgSubscription = this.firebaseService
+    .getMessagesForChat(chatId)
+    .subscribe({
+      next: (msgs) => {
+        this.messages.set(msgs);
+        this.isChatLoading.set(false);
+        this.shouldScrollToBottom = true;
+      },
+      error: (err) => {
+        console.error(err);
+        this.isChatLoading.set(false);
+      }
+    });
+}
+
+  /* ================= AUDIO NOTES RECORDER & PLAYER ================= */
+
+  async startRecording() {
+    if (this.isRecording()) return;
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      this.isRecording.set(true);
+      this.recordingDuration.set(0);
+      this.audioChunks = [];
+
+      this.mediaRecorder = new MediaRecorder(stream);
+      this.mediaRecorder.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+          this.audioChunks.push(event.data);
+        }
+      };
+
+      this.mediaRecorder.onstop = async () => {
+        const audioBlob = new Blob(this.audioChunks, { type: 'audio/webm' });
+        const reader = new FileReader();
+        reader.onloadend = async () => {
+          const base64data = reader.result as string;
+          await this.firebaseService.sendMessage(this.chatId, 'Voice Message', 'audio', base64data);
+        };
+        reader.readAsDataURL(audioBlob);
+        stream.getTracks().forEach(track => track.stop());
+      };
+
+      this.mediaRecorder.start();
+
+      this.recordingTimerInterval = setInterval(() => {
+        this.recordingDuration.update(d => d + 1);
+      }, 1000);
+
+      this.setupRecordingVisualizer(stream);
+
+    } catch (err) {
+      console.error('Failed to start recording:', err);
+      alert('Could not access microphone. Please check permissions.');
+    }
+  }
+
+  stopRecording(send: boolean) {
+    if (!this.isRecording() || !this.mediaRecorder) return;
+    
+    clearInterval(this.recordingTimerInterval);
+    this.stopRecordingVisualizer();
+
+    if (send) {
+      this.mediaRecorder.stop();
+    } else {
+      this.mediaRecorder.onstop = null;
+      this.mediaRecorder.stop();
+      this.mediaRecorder.stream.getTracks().forEach(track => track.stop());
+    }
+
+    this.isRecording.set(false);
+    this.recordingDuration.set(0);
+    this.audioChunks = [];
+  }
+
+  formatDuration(sec: number): string {
+    const mins = Math.floor(sec / 60);
+    const secs = sec % 60;
+    return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
+  }
+
+  setupRecordingVisualizer(stream: MediaStream) {
+    setTimeout(() => {
+      const canvas = this.recordCanvas?.nativeElement;
+      if (!canvas) return;
+
+      const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+      const source = audioCtx.createMediaStreamSource(stream);
+      const analyser = audioCtx.createAnalyser();
+      analyser.fftSize = 64;
+      source.connect(analyser);
+
+      const bufferLength = analyser.frequencyBinCount;
+      const dataArray = new Uint8Array(bufferLength);
+
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return;
+
+      const draw = () => {
+        if (!this.isRecording()) return;
+        this.animationFrameId = requestAnimationFrame(draw);
+        analyser.getByteFrequencyData(dataArray);
+
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.fillStyle = '#00a884';
+        const barWidth = (canvas.width / bufferLength) * 1.5;
+        let barHeight;
+        let x = 0;
+
+        for (let i = 0; i < bufferLength; i++) {
+          barHeight = dataArray[i] / 2;
+          ctx.fillRect(x, canvas.height - barHeight, barWidth - 2, barHeight);
+          x += barWidth;
+        }
+      };
+
+      draw();
+      this.localAudioContext = audioCtx;
+    }, 100);
+  }
+
+  stopRecordingVisualizer() {
+    if (this.animationFrameId) {
+      cancelAnimationFrame(this.animationFrameId);
+    }
+    if (this.localAudioContext) {
+      this.localAudioContext.close();
+    }
+  }
+
+  toggleAudioPlayback(msgId: string, base64data: string) {
+    const state = this.audioPlaybackStates()[msgId] || { playing: false, progress: 0, currentTime: 0, duration: 0 };
+    
+    let audio = this.activeAudios.get(msgId);
+    if (!audio) {
+      audio = new Audio(base64data);
+      this.activeAudios.set(msgId, audio);
+      
+      audio.onloadedmetadata = () => {
+        this.updateAudioState(msgId, { duration: audio!.duration || 0 });
+      };
+      audio.ontimeupdate = () => {
+        this.updateAudioState(msgId, {
+          currentTime: audio!.currentTime,
+          progress: (audio!.currentTime / (audio!.duration || 1)) * 100
+        });
+      };
+      audio.onended = () => {
+        this.updateAudioState(msgId, { playing: false, progress: 0, currentTime: 0 });
+        audio!.currentTime = 0;
+      };
+    }
+
+    if (state.playing) {
+      audio.pause();
+      this.updateAudioState(msgId, { playing: false });
+    } else {
+      const activeId = this.playingAudioId();
+      if (activeId && activeId !== msgId) {
+        const activeAudio = this.activeAudios.get(activeId);
+        if (activeAudio) {
+          activeAudio.pause();
+          this.updateAudioState(activeId, { playing: false });
+        }
+      }
+
+      audio.play().catch(e => console.warn('Play block:', e));
+      this.playingAudioId.set(msgId);
+      this.updateAudioState(msgId, { playing: true });
+    }
+  }
+
+  private updateAudioState(msgId: string, patch: Partial<{ playing: boolean, progress: number, currentTime: number, duration: number }>) {
+    this.audioPlaybackStates.update(states => {
+      const current = states[msgId] || { playing: false, progress: 0, currentTime: 0, duration: 0 };
+      return {
+        ...states,
+        [msgId]: { ...current, ...patch }
+      };
+    });
+  }
+
+  /* ================= REAL-TIME ONLINE CALLS ================= */
+
+  async startVoiceCall() {
+    try {
+      const callId = await this.firebaseService.initiateCall(this.chatId, this.isGroupChat ? 'group' : 'direct');
+      if (!this.isGroupChat) {
+        this.setupWebRTCPeer(callId, true);
+      } else {
+        this.joinGroupVoiceCall(callId);
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  }
+
+  async acceptVoiceCall() {
+    const call = this.incomingCall();
+    if (!call) return;
+    try {
+      await this.firebaseService.acceptCall(call.id);
+      this.setupWebRTCPeer(call.id, false);
+    } catch (err) {
+      console.error(err);
+    }
+  }
+
+  async rejectVoiceCall() {
+    const call = this.incomingCall();
+    if (call) {
+      await this.firebaseService.rejectCall(call.id);
+    }
+  }
+
+  async endVoiceCall() {
+    const call = this.activeCall() || this.incomingCall();
+    if (call) {
+      await this.firebaseService.endCall(call.id);
+    }
+  }
+
+  async setupWebRTCPeer(callId: string, isCaller: boolean) {
+    try {
+      this.localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      this.setupCallAudioVisualizer(this.localStream);
+
+      const configuration = {
+        iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
+      };
+      this.peerConnection = new RTCPeerConnection(configuration);
+
+      this.localStream.getTracks().forEach(track => {
+        this.peerConnection!.addTrack(track, this.localStream!);
+      });
+
+      this.peerConnection.ontrack = (event) => {
+        const remoteAudio = new Audio();
+        remoteAudio.srcObject = event.streams[0];
+        remoteAudio.autoplay = true;
+        remoteAudio.play().catch(e => console.warn('Audio play block:', e));
+      };
+
+      this.peerConnection.onicecandidate = (event) => {
+        if (event.candidate) {
+          this.firebaseService.sendCallSignal(callId, {
+            candidate: event.candidate.toJSON(),
+            isCaller
+          });
+        }
+      };
+
+      if (this.callSignalSub) this.callSignalSub.unsubscribe();
+      this.callSignalSub = this.firebaseService.listenCallSignals(callId).subscribe(async (data: any) => {
+        if (data.offer && !isCaller) {
+          await this.peerConnection!.setRemoteDescription(new RTCSessionDescription(data.offer));
+          const answer = await this.peerConnection!.createAnswer();
+          await this.peerConnection!.setLocalDescription(answer);
+          this.firebaseService.sendCallSignal(callId, { answer: { type: answer.type, sdp: answer.sdp } });
+        } else if (data.answer && isCaller) {
+          await this.peerConnection!.setRemoteDescription(new RTCSessionDescription(data.answer));
+        } else if (data.candidate) {
+          await this.peerConnection!.addIceCandidate(new RTCIceCandidate(data.candidate));
+        }
+      });
+
+      if (isCaller) {
+        const offer = await this.peerConnection.createOffer();
+        await this.peerConnection.setLocalDescription(offer);
+        this.firebaseService.sendCallSignal(callId, { offer: { type: offer.type, sdp: offer.sdp } });
+      }
+
+    } catch (err) {
+      console.warn('WebRTC peer setup failed (simulated call running):', err);
+    }
+  }
+
+  async joinGroupVoiceCall(callId: string) {
+    try {
+      this.localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      this.setupCallAudioVisualizer(this.localStream);
+      await this.firebaseService.acceptCall(callId);
+      this.startGroupSpeakingDetector(callId);
+    } catch (err) {
+      console.error(err);
+    }
+  }
+
+  private speakingDetectorInterval: any = null;
+  startGroupSpeakingDetector(callId: string) {
+    if (!this.localStream) return;
+    
+    const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+    const source = audioCtx.createMediaStreamSource(this.localStream);
+    const analyser = audioCtx.createAnalyser();
+    analyser.fftSize = 64;
+    source.connect(analyser);
+
+    const bufferLength = analyser.frequencyBinCount;
+    const dataArray = new Uint8Array(bufferLength);
+    let wasSpeaking = false;
+
+    this.speakingDetectorInterval = setInterval(() => {
+      analyser.getByteFrequencyData(dataArray);
+      let sum = 0;
+      for (let i = 0; i < bufferLength; i++) {
+        sum += dataArray[i];
+      }
+      const average = sum / bufferLength;
+      const isSpeaking = average > 35;
+
+      if (isSpeaking !== wasSpeaking) {
+        wasSpeaking = isSpeaking;
+        this.firebaseService.updateSpeakerStatus(callId, isSpeaking);
+      }
+    }, 200);
+  }
+
+  setupCallAudioVisualizer(stream: MediaStream) {
+    setTimeout(() => {
+      const canvas = this.callCanvas?.nativeElement;
+      if (!canvas) return;
+
+      const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+      const source = audioCtx.createMediaStreamSource(stream);
+      const analyser = audioCtx.createAnalyser();
+      analyser.fftSize = 128;
+      source.connect(analyser);
+
+      const bufferLength = analyser.frequencyBinCount;
+      const dataArray = new Uint8Array(bufferLength);
+
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return;
+
+      const draw = () => {
+        if (!this.activeCall()) return;
+        this.animationFrameId = requestAnimationFrame(draw);
+        analyser.getByteFrequencyData(dataArray);
+
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        
+        const centerX = canvas.width / 2;
+        const centerY = canvas.height / 2;
+        ctx.strokeStyle = 'rgba(16, 185, 129, 0.4)';
+        ctx.lineWidth = 2;
+
+        let sum = 0;
+        for (let i = 0; i < bufferLength; i++) {
+          sum += dataArray[i];
+        }
+        const avg = sum / bufferLength;
+        const baseRadius = 60 + avg * 0.4;
+
+        ctx.beginPath();
+        ctx.arc(centerX, centerY, baseRadius, 0, 2 * Math.PI);
+        ctx.stroke();
+
+        ctx.strokeStyle = 'rgba(16, 185, 129, 0.2)';
+        ctx.beginPath();
+        ctx.arc(centerX, centerY, baseRadius + 15, 0, 2 * Math.PI);
+        ctx.stroke();
+      };
+
+      draw();
+      this.localAudioContext = audioCtx;
+    }, 100);
+  }
+
+  cleanupCall() {
+    this.stopRingtone();
+    clearInterval(this.callDurationInterval);
+    clearInterval(this.speakingDetectorInterval);
+    this.callDuration.set(0);
+
+    if (this.localStream) {
+      this.localStream.getTracks().forEach(track => track.stop());
+      this.localStream = null;
+    }
+    if (this.peerConnection) {
+      this.peerConnection.close();
+      this.peerConnection = null;
+    }
+    if (this.callSignalSub) {
+      this.callSignalSub.unsubscribe();
+      this.callSignalSub = null;
+    }
+
+    if (this.animationFrameId) {
+      cancelAnimationFrame(this.animationFrameId);
+    }
+    if (this.localAudioContext) {
+      this.localAudioContext.close();
+      this.localAudioContext = null;
+    }
+  }
+
+  startCallTimer() {
+    if (this.callDurationInterval) return;
+    this.callDuration.set(0);
+    this.callDurationInterval = setInterval(() => {
+      this.callDuration.update(d => d + 1);
+    }, 1000);
+  }
+
+  toggleMute() {
+    this.callMuted.update(v => !v);
+    if (this.localStream) {
+      this.localStream.getAudioTracks().forEach(track => {
+        track.enabled = !this.callMuted();
+      });
+    }
+  }
+
+  toggleSpeaker() {
+    this.speakerEnabled.update(v => !v);
+  }
+
+  playRingtone() {
+    if (this.ringtoneAudioContext) return;
+    try {
+      this.ringtoneAudioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+      
+      const playTone = () => {
+        if (!this.ringtoneAudioContext) return;
+        
+        const osc1 = this.ringtoneAudioContext.createOscillator();
+        const osc2 = this.ringtoneAudioContext.createOscillator();
+        const gain = this.ringtoneAudioContext.createGain();
+
+        osc1.type = 'sine';
+        osc1.frequency.setValueAtTime(440, this.ringtoneAudioContext.currentTime);
+        osc2.type = 'sine';
+        osc2.frequency.setValueAtTime(480, this.ringtoneAudioContext.currentTime);
+
+        gain.gain.setValueAtTime(0, this.ringtoneAudioContext.currentTime);
+        gain.gain.linearRampToValueAtTime(0.2, this.ringtoneAudioContext.currentTime + 0.1);
+        gain.gain.exponentialRampToValueAtTime(0.001, this.ringtoneAudioContext.currentTime + 0.6);
+
+        osc1.connect(gain);
+        osc2.connect(gain);
+        gain.connect(this.ringtoneAudioContext.destination);
+
+        osc1.start();
+        osc2.start();
+
+        osc1.stop(this.ringtoneAudioContext.currentTime + 0.6);
+        osc2.stop(this.ringtoneAudioContext.currentTime + 0.6);
+      };
+
+      const interval = setInterval(() => {
+        if (!this.ringtoneAudioContext) {
+          clearInterval(interval);
+          return;
+        }
+        playTone();
+        setTimeout(() => playTone(), 250);
+      }, 2500);
+
+      playTone();
+      setTimeout(() => playTone(), 250);
+
+    } catch (e) {
+      console.warn('Could not play ringtone:', e);
+    }
+  }
+  stopRingtone() {
+    if (this.ringtoneAudioContext) {
+      this.ringtoneAudioContext.close();
+      this.ringtoneAudioContext = null;
+    }
   }
 }

@@ -6,11 +6,12 @@
   <div class="profile-header">
     @if (currentUser) {
     <div class="user-avatar-wrap clickable-profile" (click)="viewMode.set('profile')" title="View Profile">
-      <div class="user-avatar overflow-hidden d-flex align-items-center justify-content-center" [style.background-color]="getUserColor(currentUser.uid)">
+      <div class="user-avatar overflow-hidden d-flex align-items-center justify-content-center"
+        [style.background-color]="getUserColor(currentUser.uid)">
         @if (currentUser.avatar && currentUser.avatar.startsWith('data:image/')) {
-          <img [src]="currentUser.avatar" alt="Profile Picture" class="w-100 h-100 object-fit-cover" />
+        <img [src]="currentUser.avatar" alt="Profile Picture" class="w-100 h-100 object-fit-cover" />
         } @else {
-          {{ getUserInitials(currentUser.displayName) }}
+        {{ getUserInitials(currentUser.displayName) }}
         }
       </div>
       <span class="live-dot status-online"></span>
@@ -20,6 +21,11 @@
       <span class="user-bio-preview">{{ currentUser.bio || 'Add about status...' }}</span>
     </div>
     }
+
+
+
+
+
   </div>
 
   <!-- Search Box Section -->
@@ -33,6 +39,14 @@
       }
     </div>
   </div>
+
+
+  @if (loading()) {
+  <div class="spinner-overlay">
+    <div class="spinner"></div>
+  </div>
+  } @else {
+
 
   <!-- Chats List Section -->
   <div class="chats-list">
@@ -72,15 +86,20 @@
 
         <!-- Group Avatar Upload -->
         <div class="d-flex align-items-center gap-3 mt-2 mb-1">
-          <input type="file" #grpAvatarInput (change)="onNewGroupAvatarSelected($event)" style="display: none;" accept="image/*" />
-          <div class="grp-avatar-preview overflow-hidden d-flex align-items-center justify-content-center bg-black bg-opacity-30 rounded-circle border border-secondary" style="width: 44px; height: 44px; cursor: pointer;" (click)="grpAvatarInput.click()" title="Upload Group Picture">
+          <input type="file" #grpAvatarInput (change)="onNewGroupAvatarSelected($event)" style="display: none;"
+            accept="image/*" />
+          <div
+            class="grp-avatar-preview overflow-hidden d-flex align-items-center justify-content-center bg-black bg-opacity-30 rounded-circle border border-secondary"
+            style="width: 44px; height: 44px; cursor: pointer;" (click)="grpAvatarInput.click()"
+            title="Upload Group Picture">
             @if (newGroupAvatar()) {
-              <img [src]="newGroupAvatar()" alt="Preview" class="w-100 h-100 object-fit-cover" />
+            <img [src]="newGroupAvatar()" alt="Preview" class="w-100 h-100 object-fit-cover" />
             } @else {
-              <i class="bi bi-camera text-secondary fs-5"></i>
+            <i class="bi bi-camera text-secondary fs-5"></i>
             }
           </div>
-          <span class="text-secondary small" style="cursor: pointer; user-select: none;" (click)="grpAvatarInput.click()">Set Group Picture</span>
+          <span class="text-secondary small" style="cursor: pointer; user-select: none;"
+            (click)="grpAvatarInput.click()">Set Group Picture</span>
         </div>
 
         <!-- Select participants list -->
@@ -211,14 +230,15 @@
         [class.active]="activeChatId === g.id">
         <div class="d-flex align-items-center flex-grow-1 min-w-0" (click)="selectChat('group_'+g.id)"
           style="cursor: pointer;">
-          <div class="chat-avatar-wrap group-avatar-style-dynamic overflow-hidden flex-shrink-0 m-2 d-flex align-items-center justify-content-center"
+          <div
+            class="chat-avatar-wrap group-avatar-style-dynamic overflow-hidden flex-shrink-0 m-2 d-flex align-items-center justify-content-center"
             [style.background-color]="getUserColor(g.id)">
             @if (g.avatar && g.avatar.startsWith('data:image/')) {
-              <img [src]="g.avatar" alt="Group Icon" class="w-100 h-100 object-fit-cover" />
+            <img [src]="g.avatar" alt="Group Icon" class="w-100 h-100 object-fit-cover" />
             } @else {
-              <div class="chat-avatar-initials">
-                {{ getUserInitials(g.name) }}
-              </div>
+            <div class="chat-avatar-initials">
+              {{ getUserInitials(g.name) }}
+            </div>
             }
           </div>
           <div class="chat-details text-truncate min-w-0">
@@ -242,11 +262,12 @@
           <div class="d-flex align-items-center flex-grow-1 min-w-0 m-2" (click)="selectChat(user.uid)"
             style="cursor: pointer;">
             <div class="chat-avatar-wrap">
-              <div class="chat-avatar overflow-hidden d-flex align-items-center justify-content-center" [style.background-color]="getUserColor(user.uid)">
+              <div class="chat-avatar overflow-hidden d-flex align-items-center justify-content-center"
+                [style.background-color]="getUserColor(user.uid)">
                 @if (user.avatar && user.avatar.startsWith('data:image/')) {
-                  <img [src]="user.avatar" alt="Profile Picture" class="w-100 h-100 object-fit-cover" />
+                <img [src]="user.avatar" alt="Profile Picture" class="w-100 h-100 object-fit-cover" />
                 } @else {
-                  {{ getUserInitials(user.displayName) }}
+                {{ getUserInitials(user.displayName) }}
                 }
               </div>
               <span class="live-dot" [class.status-online]="user.status === 'online'"
@@ -273,7 +294,7 @@
       </div>
     </div>
   </div>
-
+  }
   <!-- Sidebar Footer -->
   <div class="sidebar-footer">
     <!-- <div class="connection-pill" [class.mock]="firebaseService.isMockMode">
@@ -300,17 +321,22 @@
     <!-- Profile Content Scrollable -->
     <div class="profile-panel-content">
       <!-- Giant Circle Avatar -->
-      <input type="file" #profilePicInput (change)="onProfilePicSelected($event)" style="display: none;" accept="image/*" />
-      <div class="giant-avatar-wrap position-relative" style="cursor: pointer; margin-bottom: 24px;" (click)="profilePicInput.click()">
-        <div class="giant-avatar overflow-hidden d-flex align-items-center justify-content-center" [style.background-color]="getUserColor(currentUser.uid)">
+      <input type="file" #profilePicInput (change)="onProfilePicSelected($event)" style="display: none;"
+        accept="image/*" />
+      <div class="giant-avatar-wrap position-relative" style="cursor: pointer; margin-bottom: 24px;"
+        (click)="profilePicInput.click()">
+        <div class="giant-avatar overflow-hidden d-flex align-items-center justify-content-center"
+          [style.background-color]="getUserColor(currentUser.uid)">
           @if (currentUser.avatar && currentUser.avatar.startsWith('data:image/')) {
-            <img [src]="currentUser.avatar" alt="Profile Picture" class="w-100 h-100 object-fit-cover" />
+          <img [src]="currentUser.avatar" alt="Profile Picture" class="w-100 h-100 object-fit-cover" />
           } @else {
-            {{ getUserInitials(currentUser.displayName) }}
+          {{ getUserInitials(currentUser.displayName) }}
           }
           <div class="avatar-hover-overlay d-flex flex-column align-items-center justify-content-center">
             <i class="bi bi-camera-fill text-white fs-3 mb-1"></i>
-            <span class="text-white text-center fw-semibold" style="font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.5px; line-height: 1.2;">Change Profile Photo</span>
+            <span class="text-white text-center fw-semibold"
+              style="font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.5px; line-height: 1.2;">Change
+              Profile Photo</span>
           </div>
         </div>
       </div>
@@ -362,3 +388,10 @@
   }
 
 </div>
+
+
+@if (loading()) {
+<div class="spinner-overlay">
+  <div class="spinner text-light"></div>
+</div>
+}
