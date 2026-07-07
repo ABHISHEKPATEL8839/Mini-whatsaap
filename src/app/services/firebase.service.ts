@@ -181,6 +181,29 @@ export class FirebaseService {
   readonly activeCall$ = this._activeCall$.asObservable();
   readonly incomingCall$ = this._incomingCall$.asObservable();
 
+  private loadedCollections = {
+    users: false,
+    messages: false,
+    groups: false,
+    invitations: false,
+    statuses: false
+  };
+
+  private _dataLoaded$ = new BehaviorSubject<boolean>(false);
+  readonly dataLoaded$ = this._dataLoaded$.asObservable();
+
+  private checkAllLoaded() {
+    if (
+      this.loadedCollections.users &&
+      this.loadedCollections.messages &&
+      this.loadedCollections.groups &&
+      this.loadedCollections.invitations &&
+      this.loadedCollections.statuses
+    ) {
+      this._dataLoaded$.next(true);
+    }
+  }
+
   private callChannel: BroadcastChannel | null = null;
 
   constructor() {
@@ -292,6 +315,14 @@ export class FirebaseService {
             } catch (statusErr) { }
           }
           this._currentUser$.next(null);
+          this.loadedCollections = {
+            users: false,
+            messages: false,
+            groups: false,
+            invitations: false,
+            statuses: false
+          };
+          this._dataLoaded$.next(false);
           if (firstAuthCheck) {
             firstAuthCheck = false;
             this._authLoaded$.next(true);
@@ -340,6 +371,15 @@ export class FirebaseService {
           this._authLoaded$.next(true);
         }
 
+        this.loadedCollections = {
+          users: false,
+          messages: false,
+          groups: false,
+          invitations: false,
+          statuses: false
+        };
+        this._dataLoaded$.next(false);
+
         this.listenUsersFirebase();
         this.listenMessagesFirebase();
         this.listenGroupsFirebase();
@@ -373,6 +413,10 @@ export class FirebaseService {
     onSnapshot(collection(this.db, 'users'), (snap) => {
       const users = snap.docs.map(d => d.data() as UserProfile);
       this._users$.next(users);
+      if (!this.loadedCollections.users) {
+        this.loadedCollections.users = true;
+        this.checkAllLoaded();
+      }
     });
   }
 
@@ -402,6 +446,10 @@ export class FirebaseService {
       });
 
       this._messages$.next(msgs);
+      if (!this.loadedCollections.messages) {
+        this.loadedCollections.messages = true;
+        this.checkAllLoaded();
+      }
     });
   }
 
@@ -410,6 +458,10 @@ export class FirebaseService {
     onSnapshot(collection(this.db, 'groups'), (snap) => {
       const groups = snap.docs.map(d => d.data() as ChatGroup);
       this._groups$.next(groups);
+      if (!this.loadedCollections.groups) {
+        this.loadedCollections.groups = true;
+        this.checkAllLoaded();
+      }
     });
   }
 
@@ -418,6 +470,10 @@ export class FirebaseService {
     onSnapshot(collection(this.db, 'invitations'), (snap) => {
       const invites = snap.docs.map(d => d.data() as Invitation);
       this._invitations$.next(invites);
+      if (!this.loadedCollections.invitations) {
+        this.loadedCollections.invitations = true;
+        this.checkAllLoaded();
+      }
     });
   }
 
@@ -473,6 +529,7 @@ export class FirebaseService {
     this._messages$.next(this.mockMessages);
     this._statuses$.next(this.mockStatuses);
     this._authLoaded$.next(true);
+    this._dataLoaded$.next(true);
 
     window.addEventListener('storage', (event) => {
       if (this.isMockMode) {
@@ -1317,6 +1374,10 @@ export class FirebaseService {
       const now = Date.now();
       const activeStatuses = list.filter(s => now - s.timestamp < 24 * 60 * 60 * 1000);
       this._statuses$.next(activeStatuses);
+      if (!this.loadedCollections.statuses) {
+        this.loadedCollections.statuses = true;
+        this.checkAllLoaded();
+      }
     });
   }
 

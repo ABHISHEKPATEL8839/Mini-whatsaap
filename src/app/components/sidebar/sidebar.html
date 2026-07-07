@@ -253,7 +253,7 @@
                 <div class="status-avatar" [style.background-color]="getUserColor(currentUser?.uid || '')">
 
                   @if (currentUser?.avatar?.startsWith('data:image/')) {
-                  <img [src]="currentUser?.photoURL">
+                  <img [src]="currentUser?.avatar">
                   }
                   @else {
                   {{ getUserInitials(currentUser?.displayName || 'Me') }}
@@ -360,7 +360,7 @@
             <div class="chat-details text-truncate min-w-0 m-2">
               <div class="chat-header-row ">
                 <span class="chat-name">{{ user.displayName }}</span>
-                @if ((getUnreadCount(user.uid) | async); as count) {
+                @if (unreadCounts().get(user.uid); as count) {
                 @if (count > 0) {
                 <span class="unread-badge">{{ count }}</span>
                 }
@@ -541,6 +541,7 @@
         <div class="status-progress-fill"
           [style.width.%]="idx < activeStoryIndex() ? 100 : (idx === activeStoryIndex() ? storyProgress() : 0)">
         </div>
+        
       </div>
       }
     </div>

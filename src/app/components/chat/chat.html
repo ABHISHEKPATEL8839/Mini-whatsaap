@@ -72,8 +72,6 @@
         <i class="bi bi-telephone"></i>
       </button>
 
-      <!-- <button class="header-action-btn" (click)="startVoiceCall()" title="Start Online Voice Chat" type="button"><i
-          class="bi bi-telephone"></i></button> -->
       <button class="header-action-btn" (click)="startVideoCall()" title="Video Call" type="button"><i class="bi bi-camera-video"></i></button>
       <button class="header-action-btn" [class.active]="showOptionsMenu()" (click)="toggleOptionsMenu()"
         title="More Options" type="button">
@@ -198,24 +196,6 @@
 
     @for (msg of messages(); track msg.id) {
     <div class="message-row" [class.sent]="isSentByMe(msg)" [class.received]="!isSentByMe(msg)">
-      <!-- @if (!isSentByMe(msg)) { -->
-      <!-- <div class="msg-avatar overflow-hidden d-flex align-items-center justify-content-center"
-        [style.background-color]="getUserColor(msg.senderId)" [title]="getSenderName(msg)">
-  
-        <img [src]="getSenderAvatar(msg)" alt="Avatar" class="w-100 h-100 object-fit-cover" />
-        } @else {
-        {{ getUserInitials(getSenderName(msg)) }}
-        }
-      </div> -->
-      <!-- <div class="msg-avatar overflow-hidden d-flex align-items-center justify-content-center"
-        [style.background-color]="getUserColor(msg.senderId)">
-        @if (getSenderAvatar(msg)) {
-        <img [src]="getSenderAvatar(msg)" class="w-100 h-100 object-fit-cover" />
-        } @else {
-        {{ getUserInitials(getSenderName(msg)) }}
-        }
-      </div> -->
-      <!-- } -->
 
       <div class="message-bubble-wrap position-relative">
         @if (!isSentByMe(msg) && (chatId === 'group' || chatId.startsWith('group_'))) {
@@ -370,10 +350,6 @@
       <textarea id="message-input" class="message-textarea" placeholder="Type a message..." [ngModel]="messageText()"
         (ngModelChange)="messageText.set($event)" (keydown)="onKeyDown($event)" rows="1"
         [disabled]="isSending()"></textarea>
-      <!-- Online Voice Chat Trigger Button -->
-      <!-- <button class="toolbar-btn voice-call-input-btn me-2" (click)="startVoiceCall()" title="Start Online Voice Chat" type="button">
-          <i class="bi bi-telephone-fill text-success"></i>
-        </button> -->
     </div>
 
     @if (messageText().trim() || selectedFileBase64()) {

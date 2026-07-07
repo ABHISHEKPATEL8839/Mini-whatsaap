@@ -1,13 +1,13 @@
 import { Component, Input, Output, EventEmitter, OnInit, OnDestroy, signal, computed, effect } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { AsyncPipe, UpperCasePipe, DatePipe } from '@angular/common';
+import { UpperCasePipe, DatePipe } from '@angular/common';
 import { Subscription, Observable } from 'rxjs';
-import { FirebaseService, UserProfile, ChatGroup, Invitation, Status } from '../../services/firebase.service';
+import { FirebaseService, UserProfile, ChatGroup, Invitation, Status, Message } from '../../services/firebase.service';
 
 @Component({
   selector: 'app-sidebar',
   standalone: true,
-  imports: [FormsModule, AsyncPipe, UpperCasePipe, DatePipe],
+  imports: [FormsModule, UpperCasePipe, DatePipe],
   templateUrl: './sidebar.html',
   styleUrl: './sidebar.css',
 })
@@ -40,6 +40,24 @@ export class SidebarComponent implements OnInit, OnDestroy {
   groups = signal<ChatGroup[]>([]);
   invitations = signal<Invitation[]>([]);
   allStatuses = signal<Status[]>([]);
+  allMessages = signal<Message[]>([]);
+
+  unreadCounts = computed(() => {
+    const me = this.currentUser?.uid;
+    const msgs = this.allMessages();
+    const counts = new Map<string, number>();
+
+    if (!me) return counts;
+
+    msgs.forEach(m => {
+      if (m.receiverId === me && !m.read) {
+        const sender = m.senderId;
+        counts.set(sender, (counts.get(sender) || 0) + 1);
+      }
+    });
+
+    return counts;
+  });
 
   // Status Creator signals
   showStatusCreator = signal(false);
@@ -169,43 +187,39 @@ export class SidebarComponent implements OnInit, OnDestroy {
   }
 
 ngOnInit() {
-  this.loading.set(true);
-
-  let loaded = 0;
-
-  const checkLoaded = () => {
-    loaded++;
-    if (loaded === 4) {
-      this.loading.set(false);
-    }
-  };
+  this.subs.push(
+    this.firebaseService.dataLoaded$.subscribe(loaded => {
+      this.loading.set(!loaded);
+    })
+  );
 
   this.subs.push(
     this.firebaseService.users$.subscribe(users => {
       this.allUsers.set(users);
-      checkLoaded();
-      
     })
   );
 
   this.subs.push(
     this.firebaseService.groups$.subscribe(groups => {
       this.groups.set(groups);
-      checkLoaded();
     })
   );
 
   this.subs.push(
     this.firebaseService.invitations$.subscribe(invites => {
       this.invitations.set(invites);
-      checkLoaded();
     })
   );
 
   this.subs.push(
     this.firebaseService.statuses$.subscribe(statuses => {
       this.allStatuses.set(statuses);
-      checkLoaded();
+    })
+  );
+
+  this.subs.push(
+    this.firebaseService.messages$.subscribe(messages => {
+      this.allMessages.set(messages);
     })
   );
 }

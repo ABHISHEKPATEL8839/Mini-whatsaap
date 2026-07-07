@@ -92,6 +92,12 @@ export class ChatComponent implements OnInit, OnDestroy, OnChanges, AfterViewChe
   users = signal<UserProfile[]>([]);
   groups = signal<ChatGroup[]>([]);
 
+  usersMap = computed(() => {
+    const map = new Map<string, UserProfile>();
+    this.users().forEach(u => map.set(u.uid, u));
+    return map;
+  });
+
   get isGroupChat(): boolean {
     const cid = this.chatId;
     return cid === 'group' || cid.startsWith('group_') || this.groups().some(g => g.id === cid);
@@ -318,9 +324,7 @@ export class ChatComponent implements OnInit, OnDestroy, OnChanges, AfterViewChe
         next: (msgs) => {
           this.messages.set(msgs);
           this.shouldScrollToBottom = true;
-          setTimeout(() => {
-            this.isChatLoading.set(false);
-          }, 350);
+          this.isChatLoading.set(false);
         },
         error: (err) => {
           console.error(err);
@@ -369,12 +373,12 @@ export class ChatComponent implements OnInit, OnDestroy, OnChanges, AfterViewChe
 
   getSenderName(message: Message): string {
     if (this.isSentByMe(message)) return 'You';
-    const sender = this.users().find(u => u.uid === message.senderId);
+    const sender = this.usersMap().get(message.senderId);
     return sender ? sender.displayName : (message.senderName || 'Friend');
   }
 
   getSenderAvatar(message: Message): string | null {
-    const sender = this.users().find(u => u.uid === message.senderId);
+    const sender = this.usersMap().get(message.senderId);
     return sender?.avatar || null;
   }
 
@@ -555,39 +559,7 @@ export class ChatComponent implements OnInit, OnDestroy, OnChanges, AfterViewChe
 
 
 
-  openChat(chatId: string) {
-  this.isChatLoading.set(true);
 
-  this.chatId = chatId;
-
-  this.firebaseService.getMessagesForChat(chatId).subscribe(messages => {
-    this.messages.set(messages);
-
-    this.isChatLoading.set(false);
-  });
-}
-
-loadChat(chatId: string) {
-  this.isChatLoading.set(true);
-
-  this.chatId = chatId;
-
-  this.msgSubscription?.unsubscribe();
-
-  this.msgSubscription = this.firebaseService
-    .getMessagesForChat(chatId)
-    .subscribe({
-      next: (msgs) => {
-        this.messages.set(msgs);
-        this.isChatLoading.set(false);
-        this.shouldScrollToBottom = true;
-      },
-      error: (err) => {
-        console.error(err);
-        this.isChatLoading.set(false);
-      }
-    });
-}
 
   /* ================= AUDIO NOTES RECORDER & PLAYER ================= */
 
