@@ -36,7 +36,6 @@ export class SidebarComponent implements OnInit, OnDestroy {
   inviteEmail = signal('');
   inviteError = signal('');
   inviteSuccess = signal('');
-
   allUsers = signal<UserProfile[]>([]);
   groups = signal<ChatGroup[]>([]);
   invitations = signal<Invitation[]>([]);
@@ -185,6 +184,7 @@ ngOnInit() {
     this.firebaseService.users$.subscribe(users => {
       this.allUsers.set(users);
       checkLoaded();
+      
     })
   );
 
@@ -552,6 +552,7 @@ async createGroup() {
     this.loading.set(false);
   }
 }
+
 
   onProfilePicSelected(event: any) {
     const file = event.target.files?.[0];

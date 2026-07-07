@@ -224,111 +224,91 @@
       </div>
       }
 
-   
-<div class="status-actions mt-2">
 
-  <span>Add Status</span>
+      <div class="status-actions mt-2">
 
-  <button (click)="openStatusCreator('text')">
-    <i class="bi bi-fonts"></i>
-  </button>
+        <span>Add Status</span>
 
-  <button (click)="myStatusFileInput.click()">
-    <i class="bi bi-camera-fill"></i>
-  </button>
+        <button (click)="openStatusCreator('text')">
+          <i class="bi bi-fonts"></i>
+        </button>
 
-</div>
-<div class="status-container">
+        <button (click)="myStatusFileInput.click()">
+          <i class="bi bi-camera-fill"></i>
+        </button>
 
-<div class="status-stories-tray glass-status ">
+      </div>
+      <div class="status-container">
 
-    <!-- My Status -->
-    <div class="status-item m-2">
-      <div class="status-avatar-wrapper"
-           (click)="myStatuses().length > 0 
+        <div class="status-stories-tray glass-status flex-nowrap">
+
+          <!-- My Status -->
+          <div class="status-item m-2">
+            <div class="status-avatar-wrapper" (click)="myStatuses().length > 0 
               ? openStoryViewer(currentUser?.uid || '') 
               : myStatusFileInput.click()">
 
-        <div class="status-ring "
-             [class.active]="myStatuses().length > 0">
+              <div class="status-ring " [class.active]="myStatuses().length > 0">
 
-          <div class="status-avatar"
-               [style.background-color]="getUserColor(currentUser?.uid || '')">
+                <div class="status-avatar" [style.background-color]="getUserColor(currentUser?.uid || '')">
 
-            @if (currentUser?.avatar?.startsWith('data:image/')) {
-              <img [src]="currentUser?.photoURL">
-            } 
-            @else {
-              {{ getUserInitials(currentUser?.displayName || 'Me') }}
-            }
+                  @if (currentUser?.avatar?.startsWith('data:image/')) {
+                  <img [src]="currentUser?.photoURL">
+                  }
+                  @else {
+                  {{ getUserInitials(currentUser?.displayName || 'Me') }}
+                  }
+
+                </div>
+
+              </div>
+
+
+              @if(myStatuses().length === 0){
+              <div class="add-status">
+                <i class="bi bi-plus-lg"></i>
+              </div>
+              }
+
+            </div>
+
+            <span>My Status</span>
+
+
+            <input #myStatusFileInput type="file" hidden accept="image/*,video/*"
+              (change)="onStatusFileSelected($event)">
+          </div>
+
+          @for(group of friendsStatuses(); track group.user.uid){
+
+          <div class="status-item mt-2 mb-2" (click)="openStoryViewer(group.user.uid)">
+
+            <div class="status-ring active">
+
+              <div class="status-avatar" [style.background-color]="getUserColor(group.user.uid)">
+
+                @if(group.user.avatar?.startsWith('data:image/')){
+                <img [src]="group.user.avatar">
+                }
+                @else{
+                {{getUserInitials(group.user.displayName)}}
+                }
+
+              </div>
+
+            </div>
+
+
+            <span>
+              {{group.user.displayName}}
+            </span>
 
           </div>
 
+          }
         </div>
-
-
-        @if(myStatuses().length === 0){
-          <div class="add-status">
-            <i class="bi bi-plus-lg"></i>
-          </div>
-        }
-
       </div>
 
-      <span>My Status</span>
-
-
-      <input #myStatusFileInput
-             type="file"
-             hidden
-             accept="image/*,video/*"
-             (change)="onStatusFileSelected($event)">
-    </div>
-
-
-
-    <!-- Friends Status -->
-    @for(group of friendsStatuses(); track group.user.uid){
-
-      <div class="status-item mt-2 mb-2"
-           (click)="openStoryViewer(group.user.uid)">
-
-        <div class="status-ring active">
-
-          <div class="status-avatar"
-               [style.background-color]="getUserColor(group.user.uid)">
-
-            @if(group.user.avatar?.startsWith('data:image/')){
-              <img [src]="group.user.avatar">
-            }
-            @else{
-              {{getUserInitials(group.user.displayName)}}
-            }
-
-          </div>
-
-        </div>
-
-
-        <span>
-          {{group.user.displayName}}
-        </span>
-
-      </div>
-
-    }
-
-
-  </div>
-
-</div>
-
-
-
-
-
-
-      <!-- List of Groups (no Global Chat) -->
       @for (g of filteredGroups(); track g.id) {
       <div class="chat-item position-relative d-flex align-items-center justify-content-between"
         [class.active]="activeChatId === g.id">
@@ -399,19 +379,13 @@
     </div>
   </div>
   }
-  <!-- Sidebar Footer -->
+
   <div class="sidebar-footer">
-    <!-- <div class="connection-pill" [class.mock]="firebaseService.isMockMode">
-      <span class="indicator-dot"></span>
-      <span>{{ firebaseService.isMockMode ? 'Mock' : 'Live' }}</span> z
-    </div> -->
     <button class="logout-btn" (click)="logout()" title="Log Out">
       <i class="bi bi-box-arrow-right"></i> Logout
     </button>
   </div>
   }
-
-  <!-- ─── PROFILE VIEW ─── -->
   @if (viewMode() === 'profile' && currentUser) {
   <div class="profile-panel">
     <!-- Profile Header -->
@@ -503,43 +477,48 @@
 <!-- Status Creator Modal -->
 @if (showStatusCreator()) {
 <div class="status-creator-overlay animate-fade-in d-flex align-items-center justify-content-center">
-  <div class="status-creator-card glassmorphic shadow-premium p-4 border border-secondary border-opacity-25" 
+  <div class="status-creator-card glassmorphic shadow-premium p-4 border border-secondary border-opacity-25"
     [style.background]="statusCreatorType() === 'text' ? statusBgColor() : 'rgba(15, 23, 42, 0.95)'">
-    
-    <div class="d-flex justify-content-between align-items-center border-bottom border-secondary border-opacity-10 pb-2 mb-3">
+
+    <div
+      class="d-flex justify-content-between align-items-center border-bottom border-secondary border-opacity-10 pb-2 mb-3">
       <h5 class="fw-bold mb-0 text-white"><i class="bi bi-send-plus-fill me-2 text-success"></i>Create Status</h5>
       <button class="btn-close btn-close-white" (click)="closeStatusCreator()"></button>
     </div>
 
     <!-- TEXT Creator -->
     @if (statusCreatorType() === 'text') {
-      <div class="text-status-creator-body d-flex flex-column align-items-center justify-content-center p-3" style="min-height: 200px;">
-        <textarea class="text-status-textarea text-center text-white" placeholder="Type a status update..."
-          [ngModel]="statusText()" (ngModelChange)="statusText.set($event)" maxlength="160"></textarea>
-        <button class="btn btn-outline-light rounded-circle mt-3" (click)="cycleStatusBgColor()" title="Cycle Background Color">
-          <i class="bi bi-palette-fill"></i>
-        </button>
-      </div>
+    <div class="text-status-creator-body d-flex flex-column align-items-center justify-content-center p-3"
+      style="min-height: 200px;">
+      <textarea class="text-status-textarea text-center text-white" placeholder="Type a status update..."
+        [ngModel]="statusText()" (ngModelChange)="statusText.set($event)" maxlength="160"></textarea>
+      <button class="btn btn-outline-light rounded-circle mt-3" (click)="cycleStatusBgColor()"
+        title="Cycle Background Color">
+        <i class="bi bi-palette-fill"></i>
+      </button>
+    </div>
     }
 
     <!-- MEDIA (Image / Video) Creator -->
     @if (statusCreatorType() === 'image' || statusCreatorType() === 'video') {
-      <div class="media-status-creator-body d-flex flex-column align-items-center justify-content-center p-2">
-        <div class="status-media-preview-wrap mb-3 border border-secondary border-opacity-10 rounded overflow-hidden" style="max-height: 240px; max-width: 100%;">
-          @if (statusCreatorType() === 'image') {
-            <img [src]="statusMediaBase64()" alt="Status Preview" class="w-100 h-100 object-fit-contain" />
-          } @else {
-            <video [src]="statusMediaBase64()" controls class="w-100 h-100 object-fit-contain" style="max-height: 240px;"></video>
-          }
-        </div>
-        <input type="text" class="form-control bg-dark border-secondary text-white small" placeholder="Add a caption..."
-          [ngModel]="statusMediaCaption()" (ngModelChange)="statusMediaCaption.set($event)" maxlength="80" />
+    <div class="media-status-creator-body d-flex flex-column align-items-center justify-content-center p-2">
+      <div class="status-media-preview-wrap mb-3 border border-secondary border-opacity-10 rounded overflow-hidden"
+        style="max-height: 240px; max-width: 100%;">
+        @if (statusCreatorType() === 'image') {
+        <img [src]="statusMediaBase64()" alt="Status Preview" class="w-100 h-100 object-fit-contain" />
+        } @else {
+        <video [src]="statusMediaBase64()" controls class="w-100 h-100 object-fit-contain"
+          style="max-height: 240px;"></video>
+        }
       </div>
+      <input type="text" class="form-control bg-dark border-secondary text-white small" placeholder="Add a caption..."
+        [ngModel]="statusMediaCaption()" (ngModelChange)="statusMediaCaption.set($event)" maxlength="80" />
+    </div>
     }
 
     <div class="d-flex justify-content-end gap-2 mt-4 pt-3 border-top border-secondary border-opacity-10">
       <button class="btn btn-sm btn-outline-secondary text-white" (click)="closeStatusCreator()">Cancel</button>
-      <button class="btn btn-sm btn-success px-4" (click)="uploadStatus()" 
+      <button class="btn btn-sm btn-success px-4" (click)="uploadStatus()"
         [disabled]="statusCreatorType() === 'text' ? !statusText().trim() : !statusMediaBase64()">
         Share
       </button>
@@ -550,53 +529,61 @@
 
 <!-- Status Viewer Overlay -->
 @if (storyViewerOpen() && activeStory()) {
-<div class="status-viewer-overlay animate-fade-in d-flex flex-column align-items-center justify-content-between p-4" (click)="closeStoryViewer()">
-  
+<div class="status-viewer-overlay animate-fade-in d-flex flex-column align-items-center justify-content-between p-4"
+  (click)="closeStoryViewer()">
+
   <!-- Top Progress Bars and Poster details -->
   <div class="status-viewer-header w-100" style="max-width: 520px;" (click)="$event.stopPropagation()">
     <!-- Progress Bar Segment Grid -->
     <div class="status-progress-grid d-flex gap-1 mb-3">
       @for (item of activeStoryList(); track item.id; let idx = $index) {
-        <div class="status-progress-segment flex-fill">
-          <div class="status-progress-fill" 
-            [style.width.%]="idx < activeStoryIndex() ? 100 : (idx === activeStoryIndex() ? storyProgress() : 0)">
-          </div>
+      <div class="status-progress-segment flex-fill">
+        <div class="status-progress-fill"
+          [style.width.%]="idx < activeStoryIndex() ? 100 : (idx === activeStoryIndex() ? storyProgress() : 0)">
         </div>
+      </div>
       }
     </div>
 
     <!-- Poster Info -->
     <div class="d-flex justify-content-between align-items-center">
       <div class="d-flex align-items-center gap-2">
-        <div class="status-poster-avatar overflow-hidden d-flex align-items-center justify-content-center rounded-circle bg-secondary" style="width: 40px; height: 40px;">
+        <div
+          class="status-poster-avatar overflow-hidden d-flex align-items-center justify-content-center rounded-circle bg-secondary"
+          style="width: 40px; height: 40px;">
           @if (activeStory()!.uid === currentUser?.uid) {
-            @if (currentUser?.avatar && currentUser?.avatar!.startsWith('data:image/')) {
-              <img [src]="currentUser?.avatar" alt="Me" class="w-100 h-100 object-fit-cover" />
-            } @else {
-              {{ getUserInitials(currentUser?.displayName || 'Me') }}
-            }
+          @if (currentUser?.avatar && currentUser?.avatar!.startsWith('data:image/')) {
+          <img [src]="currentUser?.avatar" alt="Me" class="w-100 h-100 object-fit-cover" />
           } @else {
-            @if (activeStory()!.avatar && activeStory()!.avatar.startsWith('data:image/')) {
-              <img [src]="activeStory()!.avatar" alt="Poster" class="w-100 h-100 object-fit-cover" />
-            } @else {
-              {{ getUserInitials(activeStory()!.displayName) }}
-            }
+          {{ getUserInitials(currentUser?.displayName || 'Me') }}
+          }
+          } @else {
+          @if (activeStory()!.avatar && activeStory()!.avatar.startsWith('data:image/')) {
+          <img [src]="activeStory()!.avatar" alt="Poster" class="w-100 h-100 object-fit-cover" />
+          } @else {
+          {{ getUserInitials(activeStory()!.displayName) }}
+          }
           }
         </div>
         <div>
-          <h6 class="text-white mb-0 fw-bold">{{ activeStory()!.uid === currentUser?.uid ? 'My Status' : activeStory()!.displayName }}</h6>
-          <span class="text-secondary small font-monospace" style="font-size: 0.72rem;">{{ activeStory()!.timestamp | date:'shortTime' }}</span>
+          <h6 class="text-white mb-0 fw-bold">{{ activeStory()!.uid === currentUser?.uid ? 'My Status' :
+            activeStory()!.displayName }}</h6>
+          <span class="text-secondary small font-monospace" style="font-size: 0.72rem;">{{ activeStory()!.timestamp |
+            date:'shortTime' }}</span>
         </div>
       </div>
 
       <div class="d-flex gap-2">
         @if (activeStory()!.uid === currentUser?.uid) {
-          <button class="btn btn-link text-white p-1 border-0" (click)="$event.stopPropagation(); showStoryViewers.set(!showStoryViewers())" title="Viewers list">
-            <i class="bi bi-eye-fill fs-5"></i>
-          </button>
-          <button class="btn btn-link text-danger p-1 border-0" (click)="$event.stopPropagation(); firebaseService.deleteStatus(activeStory()!.id); closeStoryViewer()" title="Delete Status">
-            <i class="bi bi-trash-fill fs-5"></i>
-          </button>
+        <button class="btn btn-link text-white p-1 border-0"
+          (click)="$event.stopPropagation(); showStoryViewers.set(!showStoryViewers())" title="Viewers list">
+          <i class="bi bi-eye-fill fs-5"></i>
+        </button>
+        <button class="btn btn-link text-danger p-1 border-0"
+          (click)="$event.stopPropagation(); firebaseService.deleteStatus(activeStory()!.id); closeStoryViewer()"
+          title="Delete Status">
+          <i class="bi bi-trash-fill fs-5"></i>
+        </button>
         }
         <button class="btn-close btn-close-white" (click)="closeStoryViewer()"></button>
       </div>
@@ -604,65 +591,75 @@
   </div>
 
   <!-- Middle Content Canvas -->
-  <div class="status-viewer-content flex-grow-1 d-flex align-items-center justify-content-center w-100 position-relative py-4" style="max-width: 520px;">
-    
+  <div
+    class="status-viewer-content flex-grow-1 d-flex align-items-center justify-content-center w-100 position-relative py-4"
+    style="max-width: 520px;">
+
     <div class="skip-story-zone left-zone" (click)="$event.stopPropagation(); prevStory()" title="Previous"></div>
     <div class="skip-story-zone right-zone" (click)="$event.stopPropagation(); nextStory()" title="Next"></div>
 
     <!-- TEXT STATUS -->
     @if (activeStory()!.type === 'text') {
-      <div class="text-story-canvas d-flex align-items-center justify-content-center text-center p-4 rounded shadow-lg" 
-        [style.background]="activeStory()!.backgroundColor || 'var(--accent-emerald)'">
-        <p class="text-white fs-3 fw-bold mb-0 text-break px-3" style="max-height: 380px; overflow-y: auto;">
-          {{ activeStory()!.content }}
-        </p>
-      </div>
+    <div class="text-story-canvas d-flex align-items-center justify-content-center text-center p-4 rounded shadow-lg"
+      [style.background]="activeStory()!.backgroundColor || 'var(--accent-emerald)'">
+      <p class="text-white fs-3 fw-bold mb-0 text-break px-3" style="max-height: 380px; overflow-y: auto;">
+        {{ activeStory()!.content }}
+      </p>
+    </div>
     }
 
     <!-- MEDIA STATUS -->
     @if (activeStory()!.type === 'image' || activeStory()!.type === 'video') {
-      <div class="media-story-canvas d-flex flex-column align-items-center justify-content-center w-100 h-100">
-        <div class="story-media-wrap flex-grow-1 d-flex align-items-center justify-content-center overflow-hidden position-relative w-100" style="max-height: 70dvh;">
-          @if (activeStory()!.type === 'image') {
-            <img [src]="activeStory()!.content" alt="Story Media" class="w-100 h-100 object-fit-contain" />
-          } @else {
-            <video [src]="activeStory()!.content" autoplay loop playsinline class="w-100 h-100 object-fit-contain"></video>
-          }
-        </div>
-        @if (activeStory()!.caption) {
-          <div class="story-media-caption-bar text-center text-white px-3 py-2 w-100 rounded mt-2" 
-            style="background: rgba(0,0,0,0.5); backdrop-filter: blur(8px); max-width: 90%;">
-            {{ activeStory()!.caption }}
-          </div>
+    <div class="media-story-canvas d-flex flex-column align-items-center justify-content-center w-100 h-100">
+      <div
+        class="story-media-wrap flex-grow-1 d-flex align-items-center justify-content-center overflow-hidden position-relative w-100"
+        style="max-height: 70dvh;">
+        @if (activeStory()!.type === 'image') {
+        <img [src]="activeStory()!.content" alt="Story Media" class="w-100 h-100 object-fit-contain" />
+        } @else {
+        <video [src]="activeStory()!.content" autoplay loop playsinline class="w-100 h-100 object-fit-contain"></video>
         }
       </div>
+      @if (activeStory()!.caption) {
+      <div class="story-media-caption-bar text-center text-white px-3 py-2 w-100 rounded mt-2"
+        style="background: rgba(0,0,0,0.5); backdrop-filter: blur(8px); max-width: 90%;">
+        {{ activeStory()!.caption }}
+      </div>
+      }
+    </div>
     }
   </div>
 
   <!-- Bottom Reply or Views Box -->
-  <div class="status-viewer-footer w-100 d-flex flex-column align-items-center" style="max-width: 520px;" (click)="$event.stopPropagation()">
+  <div class="status-viewer-footer w-100 d-flex flex-column align-items-center" style="max-width: 520px;"
+    (click)="$event.stopPropagation()">
     @if (activeStory()!.uid === currentUser?.uid && showStoryViewers()) {
-      <div class="story-views-drawer bg-dark border border-secondary border-opacity-25 rounded p-3 mb-3 w-100 animate-slide-up text-white">
-        <div class="d-flex justify-content-between align-items-center mb-2 border-bottom border-secondary border-opacity-25 pb-1">
-          <span class="small fw-bold text-success"><i class="bi bi-eye-fill me-1"></i> Viewed by ({{ activeStory()!.views.length }})</span>
-          <button class="btn-close btn-close-white" style="font-size: 0.6rem;" (click)="showStoryViewers.set(false)"></button>
-        </div>
-        <div class="viewer-list-content small" style="max-height: 100px; overflow-y: auto;">
-          {{ getViewerNames(activeStory()!.views) }}
-        </div>
+    <div
+      class="story-views-drawer bg-dark border border-secondary border-opacity-25 rounded p-3 mb-3 w-100 animate-slide-up text-white">
+      <div
+        class="d-flex justify-content-between align-items-center mb-2 border-bottom border-secondary border-opacity-25 pb-1">
+        <span class="small fw-bold text-success"><i class="bi bi-eye-fill me-1"></i> Viewed by ({{
+          activeStory()!.views.length }})</span>
+        <button class="btn-close btn-close-white" style="font-size: 0.6rem;"
+          (click)="showStoryViewers.set(false)"></button>
       </div>
+      <div class="viewer-list-content small" style="max-height: 100px; overflow-y: auto;">
+        {{ getViewerNames(activeStory()!.views) }}
+      </div>
+    </div>
     }
 
     @if (activeStory()!.uid !== currentUser?.uid) {
-      <div class="status-reply-box-wrap d-flex gap-2 w-100 p-2 rounded-pill bg-dark border border-secondary border-opacity-20">
-        <input type="text" class="status-reply-input flex-grow-1 border-0 bg-transparent text-white px-3" 
-          placeholder="Reply to status..." [ngModel]="storyReplyText()" (ngModelChange)="storyReplyText.set($event)"
-          (keydown.enter)="replyToStory()" />
-        <button class="btn btn-success rounded-circle d-flex align-items-center justify-content-center p-2" 
-          [disabled]="!storyReplyText().trim()" (click)="replyToStory()" style="width: 36px; height: 36px;">
-          <i class="bi bi-send-fill text-white" style="font-size: 0.9rem;"></i>
-        </button>
-      </div>
+    <div
+      class="status-reply-box-wrap d-flex gap-2 w-100 p-2 rounded-pill bg-dark border border-secondary border-opacity-20">
+      <input type="text" class="status-reply-input flex-grow-1 border-0 bg-transparent text-white px-3"
+        placeholder="Reply to status..." [ngModel]="storyReplyText()" (ngModelChange)="storyReplyText.set($event)"
+        (keydown.enter)="replyToStory()" />
+      <button class="btn btn-success rounded-circle d-flex align-items-center justify-content-center p-2"
+        [disabled]="!storyReplyText().trim()" (click)="replyToStory()" style="width: 36px; height: 36px;">
+        <i class="bi bi-send-fill text-white" style="font-size: 0.9rem;"></i>
+      </button>
+    </div>
     }
   </div>
 </div>

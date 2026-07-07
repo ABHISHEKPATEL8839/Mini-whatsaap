@@ -1526,7 +1526,7 @@
     margin: 15px;
 
     box-shadow:
-      0 10px 30px rgba(0, 0, 0, .35);
+      0 10px 30px #0D1018;
 
   }
 
@@ -1539,4 +1539,141 @@
 
   }
 
+}
+/* Main sidebar */
+.sidebar {
+    height: 100dvh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+
+/* Chats view area */
+.chats-list {
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+}
+
+
+/* Actual scrolling area */
+.chats-list-scroll-area {
+
+    height:100%;
+color: #0D1018;
+    overflow-y:auto;
+    overflow-x:hidden;
+
+    padding-bottom:80px;
+
+    scrollbar-width:thin;
+
+}
+
+
+/* Chrome scrollbar */
+.chats-list-scroll-area::-webkit-scrollbar {
+    width:6px;
+}
+
+.chats-list-scroll-area::-webkit-scrollbar-thumb {
+    background:#0D1018;
+    border-radius:20px;
+}
+
+
+
+/* Status section should not expand */
+.status-container {
+    flex-shrink:0;
+}
+
+
+/* Status horizontal scrolling */
+.status-stories-tray {
+
+    display:flex;
+
+    overflow-x:auto;
+    overflow-y:hidden;
+
+    white-space:nowrap;
+
+    width:100%;
+
+    flex-wrap:nowrap;
+
+    touch-action:pan-x;
+
+}
+
+
+
+.status-item{
+    flex:0 0 auto;
+}
+
+
+
+
+/* Footer fixed */
+.sidebar-footer {
+
+    flex-shrink:0;
+
+}
+@media(max-width:768px){
+
+.sidebar{
+  color: #000;
+    height:100dvh;
+}
+
+
+.chats-list-scroll-area{
+  color: #000;
+    overflow-y:auto;
+    -webkit-overflow-scrolling:touch;
+
+}
+
+
+.status-stories-tray{
+
+    padding-bottom:8px;
+
+}
+
+
+}
+/* Firefox */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #0D1018 transparent;
+}
+
+/* Chrome, Edge, Safari */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent; /* or #111b21 */
+}
+
+::-webkit-scrollbar-thumb {
+  background: #0D1018;
+  border-radius: 20px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #1b2030;
+}
+
+::-webkit-scrollbar-corner {
+  background: transparent;
 }
